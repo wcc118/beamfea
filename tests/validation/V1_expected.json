@@ -7,7 +7,7 @@
       "quantity": "displacement",
       "node_id": 1,
       "dof": "v",
-      "value": -55.8899676375404,
+      "value": -55.922330097087375,
       "formula": "delta = -P*L^3 / (3*E*I) = -1000 * 120^3 / (3 * 10.3e6 * 1.0)"
     },
     {
