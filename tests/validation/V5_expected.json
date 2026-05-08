@@ -1,0 +1,95 @@
+{
+  "case_id": "V5",
+  "description": "Fixed-fixed, L=240 in, fixed at both ends, w=-20 lb/in uniform. E=10.3e6 psi, A=1.0, Iz=1.0.",
+  "tolerance_relative": 1e-4,
+  "checks": [
+    {
+      "quantity": "displacement",
+      "node_id": 0,
+      "dof": "v",
+      "value": 0.0,
+      "formula": "w_y = 0 (fixed support)"
+    },
+    {
+      "quantity": "displacement",
+      "node_id": 1,
+      "dof": "v",
+      "value": 0.0,
+      "formula": "w_y = 0 (fixed support)"
+    },
+    {
+      "quantity": "displacement",
+      "node_id": 0,
+      "dof": "rz",
+      "value": 0.0,
+      "formula": "theta = 0 (fixed support)"
+    },
+    {
+      "quantity": "displacement",
+      "node_id": 1,
+      "dof": "rz",
+      "value": 0.0,
+      "formula": "theta = 0 (fixed support)"
+    },
+    {
+      "quantity": "reaction",
+      "node_id": 0,
+      "dof": "v",
+      "value": 2400.0,
+      "formula": "R_y_i = w*L/2 = 20 * 240 / 2 = 2400 lb upward"
+    },
+    {
+      "quantity": "reaction",
+      "node_id": 1,
+      "dof": "v",
+      "value": 2400.0,
+      "formula": "R_y_j = w*L/2 = 20 * 240 / 2 = 2400 lb upward"
+    },
+    {
+      "quantity": "reaction",
+      "node_id": 0,
+      "dof": "rz",
+      "value": 96000.0,
+      "formula": "M_i = w*L^2/12 = 20 * 240^2 / 12 = 96000 lb-in (hogging)"
+    },
+    {
+      "quantity": "reaction",
+      "node_id": 1,
+      "dof": "rz",
+      "value": 96000.0,
+      "formula": "M_j = w*L^2/12 = 20 * 240^2 / 12 = 96000 lb-in (hogging)"
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "i",
+      "component": "M",
+      "value": 96000.0,
+      "formula": "M_i = w*L^2/12 = 96000 lb-in (hogging, positive per conventions.md §2)"
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "j",
+      "component": "M",
+      "value": 96000.0,
+      "formula": "M_j = w*L^2/12 = 96000 lb-in (hogging)"
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "i",
+      "component": "V",
+      "value": 2400.0,
+      "formula": "V_i = w*L/2 = 2400 lb"
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "j",
+      "component": "V",
+      "value": -2400.0,
+      "formula": "V_j = -w*L/2 = -2400 lb"
+    }
+  ]
+}

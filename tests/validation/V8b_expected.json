@@ -1,0 +1,118 @@
+{
+  "case_id": "V8b",
+  "description": "Both Mz releases (truss bar behavior), L=120 in, axial load P=1000 lb at j. E=10.3e6 psi, A=1.0, Iz=1.0 (Iz irrelevant for axial-only).",
+  "tolerance_relative": 1e-4,
+  "checks": [
+    {
+      "quantity": "displacement",
+      "node_id": 0,
+      "dof": "u",
+      "value": 0.0,
+      "formula": "u_0 = 0 (fixed)"
+    },
+    {
+      "quantity": "displacement",
+      "node_id": 0,
+      "dof": "v",
+      "value": 0.0,
+      "formula": "v_0 = 0 (fixed)"
+    },
+    {
+      "quantity": "displacement",
+      "node_id": 0,
+      "dof": "rz",
+      "value": 0.0,
+      "formula": "theta_z_0 = 0 (fixed)"
+    },
+    {
+      "quantity": "displacement",
+      "node_id": 1,
+      "dof": "u",
+      "value": 0.00970873786407767,
+      "formula": "delta = P*L / (A*E) = 1000 * 120 / (1.0 * 10.3e6)"
+    },
+    {
+      "quantity": "displacement",
+      "node_id": 1,
+      "dof": "v",
+      "value": 0.0,
+      "formula": "v_1 = 0 (roller blocks transverse)"
+    },
+    {
+      "quantity": "displacement",
+      "node_id": 1,
+      "dof": "rz",
+      "value": 0.0,
+      "formula": "theta_z_1 = 0 (roller blocks rotation)"
+    },
+    {
+      "quantity": "reaction",
+      "node_id": 0,
+      "dof": "u",
+      "value": -1000.0,
+      "formula": "R_x = -F_x_applied = -1000 lb"
+    },
+    {
+      "quantity": "reaction",
+      "node_id": 0,
+      "dof": "v",
+      "value": 0.0,
+      "formula": "R_y = 0 (no transverse load)"
+    },
+    {
+      "quantity": "reaction",
+      "node_id": 0,
+      "dof": "rz",
+      "value": 0.0,
+      "formula": "M_z = 0 (released)"
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "i",
+      "component": "N",
+      "value": -1000.0,
+      "formula": "N_i = -P = -1000 lb (compression, axial only)"
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "i",
+      "component": "V",
+      "value": 0.0,
+      "formula": "V_i = 0 (axial-only element)"
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "i",
+      "component": "M",
+      "value": 0.0,
+      "formula": "M_i = 0 (released)"
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "j",
+      "component": "N",
+      "value": 1000.0,
+      "formula": "N_j = P = 1000 lb (tension, axial only)"
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "j",
+      "component": "V",
+      "value": 0.0,
+      "formula": "V_j = 0 (axial-only element)"
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "j",
+      "component": "M",
+      "value": 0.0,
+      "formula": "M_j = 0 (released)"
+    }
+  ]
+}

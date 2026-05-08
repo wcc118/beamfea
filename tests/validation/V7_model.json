@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "name": "V7 - L-frame with tip load",
+  "nodes": [
+    {"id": 0, "x": 0.0,   "y": 0.0},
+    {"id": 1, "x": 120.0, "y": 0.0},
+    {"id": 2, "x": 120.0, "y": 120.0}
+  ],
+  "materials": [
+    {"id": 0, "E": 10300000.0, "nu": 0.33}
+  ],
+  "elements": [
+    {
+      "id": 0,
+      "node_i": 0,
+      "node_j": 1,
+      "material_id": 0,
+      "A": 1.0,
+      "Iz": 1.0,
+      "release_i_Mz": false,
+      "release_j_Mz": false
+    },
+    {
+      "id": 1,
+      "node_i": 1,
+      "node_j": 2,
+      "material_id": 0,
+      "A": 1.0,
+      "Iz": 1.0,
+      "release_i_Mz": false,
+      "release_j_Mz": false
+    }
+  ],
+  "bcs": [
+    {"node_id": 0, "dof": "u",  "value": 0.0},
+    {"node_id": 0, "dof": "v",  "value": 0.0},
+    {"node_id": 0, "dof": "rz", "value": 0.0}
+  ],
+  "nodal_loads": [
+    {"node_id": 2, "Fx": 1000.0, "Fy": -1000.0, "Mz": 0.0}
+  ],
+  "element_loads": []
+}

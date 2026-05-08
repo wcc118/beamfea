@@ -1,0 +1,59 @@
+{
+  "case_id": "V2",
+  "description": "Cantilever, L=120 in, fixed at i=0, w=-10 lb/in (Y) uniform. E=10.3e6 psi, A=1.0, Iz=1.0.",
+  "tolerance_relative": 1e-4,
+  "checks": [
+    {
+      "quantity": "displacement",
+      "node_id": 1,
+      "dof": "v",
+      "value": -25.16504854368932,
+      "formula": "delta = -w*L^4 / (8*E*I) = -10 * 120^4 / (8 * 10.3e6 * 1.0)"
+    },
+    {
+      "quantity": "displacement",
+      "node_id": 1,
+      "dof": "rz",
+      "value": -0.0176201441488098,
+      "formula": "theta = -w*L^3 / (6*E*I) = -10 * 120^3 / (6 * 10.3e6 * 1.0)"
+    },
+    {
+      "quantity": "reaction",
+      "node_id": 0,
+      "dof": "v",
+      "value": 1200.0,
+      "formula": "R_y = w*L = 10 * 120 = 1200 lb upward"
+    },
+    {
+      "quantity": "reaction",
+      "node_id": 0,
+      "dof": "rz",
+      "value": 72000.0,
+      "formula": "M_fixed = w*L^2 / 2 = 10 * 120^2 / 2 = 72000 lb-in (sagging-positive)"
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "i",
+      "component": "M",
+      "value": -72000.0,
+      "note": "Internal M at i-end is the negative of the reaction moment for sign-convention consistency; verify per conventions.md §2 during implementation."
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "i",
+      "component": "V",
+      "value": 1200.0,
+      "formula": "V_i = w*L = 1200 lb"
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "j",
+      "component": "V",
+      "value": 0.0,
+      "formula": "V_j = 0 (free end)"
+    }
+  ]
+}

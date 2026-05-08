@@ -1,0 +1,88 @@
+{
+  "case_id": "V8",
+  "description": "Single Mz release at j-end (simply supported beam behavior), L=240 in, w=-10 lb/in uniform. E=10.3e6 psi, A=1.0, Iz=1.0.",
+  "tolerance_relative": 1e-4,
+  "checks": [
+    {
+      "quantity": "displacement",
+      "node_id": 0,
+      "dof": "v",
+      "value": 0.0,
+      "formula": "w_y = 0 (pin support)"
+    },
+    {
+      "quantity": "displacement",
+      "node_id": 1,
+      "dof": "v",
+      "value": 0.0,
+      "formula": "w_y = 0 (roller support)"
+    },
+    {
+      "quantity": "displacement",
+      "node_id": 0,
+      "dof": "rz",
+      "value": 0.0,
+      "formula": "theta = 0 (pin support, no moment restraint)"
+    },
+    {
+      "quantity": "reaction",
+      "node_id": 0,
+      "dof": "v",
+      "value": 1200.0,
+      "formula": "R_y_i = w*L/2 = 10 * 240 / 2 = 1200 lb upward (simply supported)"
+    },
+    {
+      "quantity": "reaction",
+      "node_id": 1,
+      "dof": "v",
+      "value": 1200.0,
+      "formula": "R_y_j = w*L/2 = 10 * 240 / 2 = 1200 lb upward (simply supported)"
+    },
+    {
+      "quantity": "reaction",
+      "node_id": 0,
+      "dof": "rz",
+      "value": 0.0,
+      "formula": "M_i = 0 (pin support, no moment capacity)"
+    },
+    {
+      "quantity": "reaction",
+      "node_id": 1,
+      "dof": "rz",
+      "value": 0.0,
+      "note": "M_j = 0 (roller support with Mz release)"
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "i",
+      "component": "M",
+      "value": 0.0,
+      "formula": "M_i = 0 (released end)"
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "j",
+      "component": "M",
+      "value": 0.0,
+      "formula": "M_j = 0 (released end)"
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "i",
+      "component": "V",
+      "value": 1200.0,
+      "formula": "V_i = w*L/2 = 1200 lb"
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "j",
+      "component": "V",
+      "value": -1200.0,
+      "formula": "V_j = -w*L/2 = -1200 lb"
+    }
+  ]
+}
