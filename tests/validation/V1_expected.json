@@ -1,0 +1,43 @@
+{
+  "case_id": "V1",
+  "description": "Cantilever, L=120 in, fixed at i=0, P=-1000 lb (Y) at j=1. E=10.3e6 psi, A=1.0, Iz=1.0.",
+  "tolerance_relative": 1e-4,
+  "checks": [
+    {
+      "quantity": "displacement",
+      "node_id": 1,
+      "dof": "v",
+      "value": -55.8899676375404,
+      "formula": "delta = -P*L^3 / (3*E*I) = -1000 * 120^3 / (3 * 10.3e6 * 1.0)"
+    },
+    {
+      "quantity": "displacement",
+      "node_id": 1,
+      "dof": "rz",
+      "value": -0.6986245954692557,
+      "formula": "theta = -P*L^2 / (2*E*I) = -1000 * 120^2 / (2 * 10.3e6 * 1.0)"
+    },
+    {
+      "quantity": "reaction",
+      "node_id": 0,
+      "dof": "v",
+      "value": 1000.0,
+      "formula": "R_y = -P_applied = 1000 lb upward"
+    },
+    {
+      "quantity": "reaction",
+      "node_id": 0,
+      "dof": "rz",
+      "value": 120000.0,
+      "formula": "M_fixed = P*L = 1000 * 120 = 120000 lb-in (sagging-positive)"
+    },
+    {
+      "quantity": "end_force",
+      "element_id": 0,
+      "end": "i",
+      "component": "M",
+      "value": -120000.0,
+      "note": "Internal M at i-end is the negative of the reaction moment for sign-convention consistency; verify per conventions.md §2 during implementation."
+    }
+  ]
+}
