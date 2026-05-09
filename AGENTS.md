@@ -84,3 +84,4 @@
 2. Stiffness matrices and shape-function integrals cite Cook or McGuire-Gallagher-Ziemer in docstrings — no formulas from memory.
 3. Every module computing or displaying internal forces references `conventions.md §2` in its docstring header.
 4. No silent unit conversions. No silent sign flips. Named transformations only.
+5. **English-only documentation.** All comments, docstrings, and string literals in Python source files must be English. DOF ordering: [u, v, θz]; sign convention: tension +N, clockwise shear +V, sagging +M. Mathematical notation (θ, β, ×, ², ·, √, etc.) is allowed where contextually appropriate. Exception: foundation_spec.md and conventions.md may contain intentional Unicode mathematical characters.

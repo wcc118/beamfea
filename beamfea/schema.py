@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 
 class Node(BaseModel):
-    """A节点在二维平面中的位置。
+    """A node in the 2D planar structure.
 
     Represents a node in the 2D planar structure with x and y coordinates.
     """
@@ -20,7 +20,7 @@ class Node(BaseModel):
 
 
 class Material(BaseModel):
-    """材料属性。
+    """Material properties.
 
     Elastic modulus E and Poisson's ratio nu. Shear modulus G is computed as E/(2(1+nu)).
     """
@@ -45,7 +45,7 @@ class Element(BaseModel):
 
 
 class NodalBC(BaseModel):
-    """约束位移自由度。
+    """Constrains a displacement DOF at a node.
 
     Constrains a displacement DOF (u, v, or rz) at a node to a prescribed value.
     """
@@ -55,9 +55,9 @@ class NodalBC(BaseModel):
 
 
 class NodalLoad(BaseModel):
-    """在节点处施加的集中力。
+    """Concentrated load applied at a node.
 
-   集中力 [Fx, Fy, Mz] 施加在节点上。
+    Concentrated load [Fx, Fy, Mz] applied at a node.
     """
     node_id: int
     Fx: float = 0
@@ -66,7 +66,7 @@ class NodalLoad(BaseModel):
 
 
 class ElementLoad(BaseModel):
-    """Element分布式载荷（仅均匀载荷 v1）。
+    """Element distributed load (uniform only in v1).
 
     Distributed loads on an element:
     - w_axial: lb/in along local +x̂
@@ -78,7 +78,7 @@ class ElementLoad(BaseModel):
 
 
 class Model(BaseModel):
-    """顶模型。
+    """Top-level model container.
 
     Top-level model container with all components.
     """
