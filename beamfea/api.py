@@ -16,6 +16,7 @@ from typing import Literal
 import matplotlib.pyplot as plt
 import numpy as np
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
@@ -219,3 +220,8 @@ def get_diagram(
     plt.close(fig)
 
     return Response(content=png_buf.read(), media_type="image/png")
+
+
+# Serve frontend static files
+app.mount("/", StaticFiles(directory="beamfea/frontend", html=True), name="frontend")
+
