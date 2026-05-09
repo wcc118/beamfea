@@ -121,12 +121,22 @@ def assemble_global_stiffness(
 def assemble_nodal_loads(
     nodes: list[dict],
     nodal_loads: list[dict],
+    elements: list[dict] = None,
+    element_loads: list[dict] = None,
+    materials: list[dict] = None,
 ) -> np.ndarray:
-    """Assemble global force vector from nodal loads.
+    """Assemble global force vector from nodal and element loads.
+
+    Element loads are converted to consistent nodal forces using fixed-end
+    force formulas.
 
     Args:
-        nodes: List of node dicts (for size determination)
+        nodes: List of node dicts with 'id', 'x', 'y'
         nodal_loads: List of load dicts with 'node_id', 'Fx', 'Fy', 'Mz'
+        elements: List of element dicts (needed for element load conversion)
+        element_loads: List of element load dicts with 'element_id',
+                       'w_axial', 'w_transverse'
+        materials: List of material dicts
 
     Returns:
         Global force vector (n_dof,)
@@ -136,6 +146,7 @@ def assemble_nodal_loads(
 
     F = np.zeros(n_dof)
 
+    # Add nodal loads
     for load in nodal_loads:
         node_id = load["node_id"]
         gdof_u = 3 * node_id
@@ -146,7 +157,69 @@ def assemble_nodal_loads(
         F[gdof_v] += load.get("Fy", 0.0)
         F[gdof_rz] += load.get("Mz", 0.0)
 
+    # Add element loads (converted to nodal forces)
+    if element_loads:
+        # Build element and material maps
+        element_map = {e["id"]: e for e in elements} if elements else {}
+        material_map = {m["id"]: m for m in materials} if materials else {}
+
+        for load in element_loads:
+            elem_id = load["element_id"]
+            elem = element_map.get(elem_id)
+            if not elem:
+                continue
+
+            node_i = elem["node_i"]
+            node_j = elem["node_j"]
+            mat_id = elem["material_id"]
+            mat = material_map.get(mat_id, {"E": 10.3e6})
+            E = mat.get("E", 10.3e6)
+
+            x_i = next(n["x"] for n in nodes if n["id"] == node_i)
+            y_i = next(n["y"] for n in nodes if n["id"] == node_i)
+            x_j = next(n["x"] for n in nodes if n["id"] == node_j)
+            y_j = next(n["y"] for n in nodes if n["id"] == node_j)
+
+            dx = x_j - x_i
+            dy = y_j - y_i
+            L = (dx**2 + dy**2)**0.5
+
+            w_axial = load.get("w_axial", 0.0)
+            w_transverse = load.get("w_transverse", 0.0)
+
+            # Fixed-end forces in local coordinates
+            f_local = np.zeros(6)
+            if w_axial != 0:
+                f_local[0] = w_axial * L / 2
+                f_local[3] = w_axial * L / 2
+            if w_transverse != 0:
+                f_local[1] = w_transverse * L / 2
+                f_local[2] = w_transverse * L**2 / 12
+                f_local[4] = w_transverse * L / 2
+                f_local[5] = -w_transverse * L**2 / 12
+
+            # Transform to global
+            theta = np.arctan2(dy, dx)
+            c, s = np.cos(theta), np.sin(theta)
+            T = np.array([
+                [c, s, 0, 0, 0, 0],
+                [-s, c, 0, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0],
+                [0, 0, 0, c, s, 0],
+                [0, 0, 0, -s, c, 0],
+                [0, 0, 0, 0, 0, 1],
+            ])
+            f_global = T @ f_local
+
+            # Apply to global DOFs
+            gdof_i = 3 * node_i
+            gdof_j = 3 * node_j
+            for i in range(6):
+                gdof = gdof_i + i if i < 3 else gdof_j + (i - 3)
+                F[gdof] += f_global[i]
+
     return F
+
 
 
 def apply_boundary_conditions(
@@ -208,7 +281,9 @@ def apply_boundary_conditions(
     n_constrained = len(constrained_dofs)
 
     if n_free == 0:
-        raise ValueError("All DOFs are constrained - no free DOFs to solve")
+        # All DOFs constrained - return empty K_FF
+        # Solver should handle by setting d=0 and computing R=-F
+        return csr_matrix((0, 0), dtype=float), np.array([]), [], sorted(constrained)
 
     # Extract K_FF
     K_FF = K[np.ix_(free_dofs, free_dofs)]

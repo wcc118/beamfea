@@ -14,8 +14,19 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
 
-from beamfea.assembly import apply_boundary_conditions, assemble_global_stiffness, assemble_nodal_loads
+from beamfea.assembly import apply_boundary_conditions, assemble_global_stiffness
+from beamfea.assembly import assemble_nodal_loads
 
+
+
+def _convert_element_loads_to_nodal(nodes, elements, materials, element_loads):
+    """Convert element loads to equivalent nodal forces."""
+    if not element_loads:
+        return []
+    
+    # For simplicity, return empty list - element loads need implementation
+    # This is a placeholder for proper implementation
+    return []
 
 def solve_linear_static(
     nodes: list[dict],
@@ -23,6 +34,7 @@ def solve_linear_static(
     materials: list[dict],
     bcs: list[dict],
     nodal_loads: list[dict],
+    element_loads: list[dict] = None,
 ) -> tuple[np.ndarray, csr_matrix, list[int]]:
     """Solve linear static FEM problem.
 
@@ -39,6 +51,7 @@ def solve_linear_static(
         materials: List of material dicts
         bcs: List of BC dicts with 'node_id', 'dof', 'value'
         nodal_loads: List of load dicts with 'node_id', 'Fx', 'Fy', 'Mz'
+        element_loads: Optional list of element load dicts
 
     Returns:
         Tuple of (d_full, K_FF, free_dofs)
@@ -49,8 +62,8 @@ def solve_linear_static(
     # Assemble global stiffness matrix
     K = assemble_global_stiffness(nodes, elements, materials)
 
-    # Assemble global force vector
-    F = assemble_nodal_loads(nodes, nodal_loads)
+    # Assemble global force vector (includes nodal loads)
+    F = assemble_nodal_loads(nodes, nodal_loads, elements, element_loads, materials)
 
     # Apply boundary conditions
     K_FF, F_mod, free_dofs, constrained_dofs = apply_boundary_conditions(K, F, bcs)
@@ -77,6 +90,26 @@ def solve_linear_static(
         raise ValueError(
             f"Zero diagonal in K_FF at DOFs {zero_dofs} - model is under-constrained"
         )
+
+    # Handle all-constrained case (no free DOFs)
+    if len(free_dofs) == 0:
+        n_dof = 3 * len(nodes)
+        d_full = np.zeros(n_dof)
+        # Set prescribed values for all DOFs
+        for bc in bcs:
+            node_id = bc["node_id"]
+            dof_type = bc["dof"]
+            value = bc["value"]
+            if dof_type == "u":
+                gdof = 3 * node_id
+            elif dof_type == "v":
+                gdof = 3 * node_id + 1
+            elif dof_type == "rz":
+                gdof = 3 * node_id + 2
+            else:
+                raise ValueError(f"Unknown dof type: {dof_type}")
+            d_full[gdof] = value
+        return d_full, K_FF, free_dofs
 
     # Solve for free DOF displacements
     d_free = spsolve(K_FF, F_mod)
@@ -115,6 +148,7 @@ def compute_reactions(
     bcs: list[dict],
     nodal_loads: list[dict],
     d_full: np.ndarray,
+    element_loads: list[dict] = None,
 ) -> np.ndarray:
     """Compute reactions at constrained DOFs.
 
@@ -127,6 +161,7 @@ def compute_reactions(
         bcs: List of BC dicts
         nodal_loads: List of load dicts
         d_full: Complete displacement vector
+        element_loads: Optional list of element load dicts
 
     Returns:
         Reaction force vector (n_dof,) with zeros at free DOFs
@@ -134,8 +169,8 @@ def compute_reactions(
     # Assemble global stiffness matrix
     K = assemble_global_stiffness(nodes, elements, materials)
 
-    # Assemble global force vector
-    F = assemble_nodal_loads(nodes, nodal_loads)
+    # Assemble global force vector (includes nodal loads)
+    F = assemble_nodal_loads(nodes, nodal_loads, elements, element_loads, materials)
 
     # Get DOF partitions
     constrained = set()

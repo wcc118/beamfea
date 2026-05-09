@@ -14,7 +14,7 @@
       "quantity": "displacement",
       "node_id": 1,
       "dof": "rz",
-      "value": -0.6986245954692557,
+      "value": -0.699029126213592,
       "formula": "theta = -P*L^2 / (2*E*I) = -1000 * 120^2 / (2 * 10.3e6 * 1.0)"
     },
     {

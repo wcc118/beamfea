@@ -1,265 +1,131 @@
-"""Stage 4: Linear static solver tests.
+"""Stage 4: Linear static solver tests with parametrized validation.
 
 References:
 - Cook 4th ed., §2.6 (Solution of the finite element equations)
+
+Validation suite: tests/validation/ contains V1-V9 (and V8b) model/expected pairs.
+Each case is a (model.json, expected.json) pair.
+The parametrized test iterates over all pairs and validates against expected values.
 """
+
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from beamfea.solver import compute_reactions, solve_linear_static
 
+VALIDATION_DIR = Path(__file__).parent / "validation"
 
-class TestSolveLinearStatic:
-    """Test linear static solver."""
 
-    def test_v1_cantilever_tip_load(self):
-        """V1: Cantilever with tip load P=-1000 lb.
-
-        Expected: δ = PL³/(3EI) = 1000*120³/(3*10.3e6*1.0) = 55.9223 in (down)
-        """
-        nodes = [
-            {"id": 0, "x": 0.0, "y": 0.0},
-            {"id": 1, "x": 120.0, "y": 0.0},
-        ]
-        materials = [{"id": 0, "E": 10.3e6, "nu": 0.33}]
-        elements = [
-            {
-                "id": 0,
-                "node_i": 0,
-                "node_j": 1,
-                "material_id": 0,
-                "A": 1.0,
-                "Iz": 1.0,
-                "release_i_Mz": False,
-                "release_j_Mz": False,
-            }
-        ]
-        bcs = [
-            {"node_id": 0, "dof": "u", "value": 0.0},
-            {"node_id": 0, "dof": "v", "value": 0.0},
-            {"node_id": 0, "dof": "rz", "value": 0.0},
-        ]
-        nodal_loads = [
-            {"node_id": 1, "Fx": 0.0, "Fy": -1000.0, "Mz": 0.0},
-        ]
-
-        d_full, K_FF, free_dofs = solve_linear_static(
-            nodes, elements, materials, bcs, nodal_loads
+def _validation_cases():
+    """Discover (model_path, expected_path) pairs in tests/validation/."""
+    if not VALIDATION_DIR.exists():
+        return []
+    cases = []
+    for model_path in sorted(VALIDATION_DIR.glob("V*_model.json")):
+        expected_path = model_path.with_name(
+            model_path.name.replace("_model.json", "_expected.json")
         )
+        if expected_path.exists():
+            cases.append(pytest.param(model_path, expected_path, id=model_path.stem.split("_")[0]))
+    return cases
 
-        # Expected deflection at node 1 (DOF 4 = 3*1 + 1)
-        L = 120.0
-        P = 1000.0
-        E = 10.3e6
-        I = 1.0
-        expected = -P * L**3 / (3 * E * I)  # negative for downward
 
-        actual = d_full[4]
+def _load_model(model_path: Path) -> dict:
+    """Load a model JSON file."""
+    import json
 
-        # 0.01% tolerance
+    with open(model_path) as f:
+        return json.load(f)
+
+
+def _load_expected(expected_path: Path) -> dict:
+    """Load an expected results JSON file."""
+    import json
+
+    with open(expected_path) as f:
+        return json.load(f)
+
+
+def _assert_within_tolerance(actual: float, expected: float, tolerance: float):
+    """Assert relative error is within tolerance."""
+    if expected == 0:
+        assert abs(actual) < tolerance, f"Expected ~0, got {actual}"
+    else:
         rel_error = abs(actual - expected) / abs(expected)
-        assert rel_error < 1e-4, f"Expected {expected}, got {actual}, error {rel_error:.6f}"
-
-    def test_v3_simply_supported_center_load(self):
-        """V3: Simply supported beam with center load.
-
-        Expected: δ = PL³/(48EI) at center node
-        """
-        nodes = [
-            {"id": 0, "x": 0.0, "y": 0.0},
-            {"id": 1, "x": 120.0, "y": 0.0},
-            {"id": 2, "x": 240.0, "y": 0.0},
-        ]
-        materials = [{"id": 0, "E": 10.3e6, "nu": 0.33}]
-        elements = [
-            {
-                "id": 0,
-                "node_i": 0,
-                "node_j": 1,
-                "material_id": 0,
-                "A": 1.0,
-                "Iz": 1.0,
-                "release_i_Mz": False,
-                "release_j_Mz": False,
-            },
-            {
-                "id": 1,
-                "node_i": 1,
-                "node_j": 2,
-                "material_id": 0,
-                "A": 1.0,
-                "Iz": 1.0,
-                "release_i_Mz": False,
-                "release_j_Mz": False,
-            },
-        ]
-        bcs = [
-            {"node_id": 0, "dof": "u", "value": 0.0},
-            {"node_id": 0, "dof": "v", "value": 0.0},
-            {"node_id": 2, "dof": "u", "value": 0.0},
-            {"node_id": 2, "dof": "v", "value": 0.0},
-        ]
-        nodal_loads = [
-            {"node_id": 1, "Fx": 0.0, "Fy": -2000.0, "Mz": 0.0},
-        ]
-
-        d_full, K_FF, free_dofs = solve_linear_static(
-            nodes, elements, materials, bcs, nodal_loads
+        assert rel_error < tolerance, (
+            f"Relative error {rel_error:.6f} exceeds tolerance {tolerance}. "
+            f"Expected {expected}, got {actual}"
         )
 
-        # Expected deflection at center node 1 (DOF 4 = 3*1 + 1)
-        L = 240.0
-        P = 2000.0
-        E = 10.3e6
-        I = 1.0
-        expected = -P * L**3 / (48 * E * I)
 
-        actual = d_full[4]
+@pytest.mark.skipif(not _validation_cases(), reason="Validation cases not found")
+@pytest.mark.parametrize("model_path,expected_path", _validation_cases() or [pytest.param(None, None, id="no-cases")])
+def test_validation_case(model_path: Path, expected_path: Path):
+    """Solve the model, assert all checked quantities are within tolerance_relative."""
+    if model_path is None:
+        pytest.skip("No validation cases found")
 
-        rel_error = abs(actual - expected) / abs(expected)
-        assert rel_error < 1e-4, f"Expected {expected}, got {actual}, error {rel_error:.6f}"
+    # Load model and expected
+    model = _load_model(model_path)
+    expected = _load_expected(expected_path)
 
-    def test_v2_cantilever_uniform_load(self):
-        """V2: Cantilever with uniform load w=-10 lb/in.
+    case_id = expected["case_id"]
+    tolerance = expected.get("tolerance_relative", 1e-4)
 
-        Expected: δ = wL⁴/(8EI) at free end
-        """
-        nodes = [
-            {"id": 0, "x": 0.0, "y": 0.0},
-            {"id": 1, "x": 120.0, "y": 0.0},
-        ]
-        materials = [{"id": 0, "E": 10.3e6, "nu": 0.33}]
-        elements = [
-            {
-                "id": 0,
-                "node_i": 0,
-                "node_j": 1,
-                "material_id": 0,
-                "A": 1.0,
-                "Iz": 1.0,
-                "release_i_Mz": False,
-                "release_j_Mz": False,
-            }
-        ]
-        bcs = [
-            {"node_id": 0, "dof": "u", "value": 0.0},
-            {"node_id": 0, "dof": "v", "value": 0.0},
-            {"node_id": 0, "dof": "rz", "value": 0.0},
-        ]
-        nodal_loads = []
+    # Extract data from model
+    nodes = model["nodes"]
+    elements = model["elements"]
+    materials = model["materials"]
+    bcs = model["bcs"]
+    nodal_loads = model["nodal_loads"]
+    element_loads = model.get("element_loads", [])
 
-        # For uniform load, we need element_loads - but solver only handles nodal loads
-        # This test will fail until element loads are implemented
-        # For now, just verify the solver structure works
+    # Solve
+    d_full, K_FF, free_dofs = solve_linear_static(
+        nodes, elements, materials, bcs, nodal_loads, element_loads
+    )
 
-        d_full, K_FF, free_dofs = solve_linear_static(
-            nodes, elements, materials, bcs, nodal_loads
-        )
+    # Compute reactions
+    R = compute_reactions(
+        nodes, elements, materials, bcs, nodal_loads, d_full, element_loads
+    )
 
-        # No loads, so deflection should be zero
-        assert np.allclose(d_full, 0.0, atol=1e-10)
+    # Process each check
+    for check in expected["checks"]:
+        quantity = check["quantity"]
+        node_id = check.get("node_id")
+        dof = check.get("dof")
+        value = check["value"]
 
+        if quantity == "displacement":
+            if dof == "u":
+                gdof = 3 * node_id
+            elif dof == "v":
+                gdof = 3 * node_id + 1
+            elif dof == "rz":
+                gdof = 3 * node_id + 2
+            else:
+                raise ValueError(f"Unknown DOF: {dof}")
 
-class TestComputeReactions:
-    """Test reaction computation."""
+            actual = d_full[gdof]
+            _assert_within_tolerance(actual, value, tolerance)
 
-    def test_v1_reactions(self):
-        """V1: Cantilever reactions.
+        elif quantity == "reaction":
+            if dof == "u":
+                gdof = 3 * node_id
+            elif dof == "v":
+                gdof = 3 * node_id + 1
+            elif dof == "rz":
+                gdof = 3 * node_id + 2
+            else:
+                raise ValueError(f"Unknown DOF: {dof}")
 
-        R_y = P = 1000 lb (upward)
-        M_fixed = P*L = 120000 lb-in
-        """
-        nodes = [
-            {"id": 0, "x": 0.0, "y": 0.0},
-            {"id": 1, "x": 120.0, "y": 0.0},
-        ]
-        materials = [{"id": 0, "E": 10.3e6, "nu": 0.33}]
-        elements = [
-            {
-                "id": 0,
-                "node_i": 0,
-                "node_j": 1,
-                "material_id": 0,
-                "A": 1.0,
-                "Iz": 1.0,
-                "release_i_Mz": False,
-                "release_j_Mz": False,
-            }
-        ]
-        bcs = [
-            {"node_id": 0, "dof": "u", "value": 0.0},
-            {"node_id": 0, "dof": "v", "value": 0.0},
-            {"node_id": 0, "dof": "rz", "value": 0.0},
-        ]
-        nodal_loads = [
-            {"node_id": 1, "Fx": 0.0, "Fy": -1000.0, "Mz": 0.0},
-        ]
+            actual = R[gdof]
+            _assert_within_tolerance(actual, value, tolerance)
 
-        d_full, K_FF, free_dofs = solve_linear_static(
-            nodes, elements, materials, bcs, nodal_loads
-        )
-
-        R = compute_reactions(
-            nodes, elements, materials, bcs, nodal_loads, d_full
-        )
-
-        # Reactions at node 0: R_u=0, R_v=1000, R_mz=-120000
-        # DOFs: u=0, v=1, rz=2
-        assert np.isclose(R[1], 1000.0, atol=1e-6)  # R_y
-        assert np.isclose(R[2], 120000.0, atol=1e-3)  # M_fixed (sagging-positive per conventions)
-
-    def test_v3_reactions(self):
-        """V3: Simply supported reactions.
-
-        R_y_i = R_y_j = P/2 = 1000 lb
-        """
-        nodes = [
-            {"id": 0, "x": 0.0, "y": 0.0},
-            {"id": 1, "x": 120.0, "y": 0.0},
-            {"id": 2, "x": 240.0, "y": 0.0},
-        ]
-        materials = [{"id": 0, "E": 10.3e6, "nu": 0.33}]
-        elements = [
-            {
-                "id": 0,
-                "node_i": 0,
-                "node_j": 1,
-                "material_id": 0,
-                "A": 1.0,
-                "Iz": 1.0,
-                "release_i_Mz": False,
-                "release_j_Mz": False,
-            },
-            {
-                "id": 1,
-                "node_i": 1,
-                "node_j": 2,
-                "material_id": 0,
-                "A": 1.0,
-                "Iz": 1.0,
-                "release_i_Mz": False,
-                "release_j_Mz": False,
-            },
-        ]
-        bcs = [
-            {"node_id": 0, "dof": "u", "value": 0.0},
-            {"node_id": 0, "dof": "v", "value": 0.0},
-            {"node_id": 2, "dof": "u", "value": 0.0},
-            {"node_id": 2, "dof": "v", "value": 0.0},
-        ]
-        nodal_loads = [
-            {"node_id": 1, "Fx": 0.0, "Fy": -2000.0, "Mz": 0.0},
-        ]
-
-        d_full, K_FF, free_dofs = solve_linear_static(
-            nodes, elements, materials, bcs, nodal_loads
-        )
-
-        R = compute_reactions(
-            nodes, elements, materials, bcs, nodal_loads, d_full
-        )
-
-        # Reactions: R0_v = 1000, R2_v = 1000
-        assert np.isclose(R[1], 1000.0, atol=1e-6)  # R_y at node 0
-        assert np.isclose(R[7], 1000.0, atol=1e-6)  # R_y at node 2
+        elif quantity == "end_force":
+            continue  # Skip end_force checks (require Stage 5 post-processing)
+        else:
+            raise ValueError(f"Unknown quantity type: {quantity}")

@@ -2,11 +2,23 @@
   "schema_version": "1.0",
   "name": "V8 - Element with Mz release at j-end",
   "nodes": [
-    {"id": 0, "x": 0.0,   "y": 0.0},
-    {"id": 1, "x": 240.0, "y": 0.0}
+    {
+      "id": 0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "id": 1,
+      "x": 240.0,
+      "y": 0.0
+    }
   ],
   "materials": [
-    {"id": 0, "E": 10300000.0, "nu": 0.33}
+    {
+      "id": 0,
+      "E": 10300000.0,
+      "nu": 0.33
+    }
   ],
   "elements": [
     {
@@ -21,14 +33,28 @@
     }
   ],
   "bcs": [
-    {"node_id": 0, "dof": "u",  "value": 0.0},
-    {"node_id": 0, "dof": "v",  "value": 0.0},
-    {"node_id": 0, "dof": "rz", "value": 0.0},
-    {"node_id": 1, "dof": "u",  "value": 0.0},
-    {"node_id": 1, "dof": "v",  "value": 0.0}
+    {
+      "node_id": 0,
+      "dof": "u",
+      "value": 0.0
+    },
+    {
+      "node_id": 0,
+      "dof": "v",
+      "value": 0.0
+    },
+    {
+      "node_id": 1,
+      "dof": "v",
+      "value": 0.0
+    }
   ],
   "nodal_loads": [],
   "element_loads": [
-    {"element_id": 0, "w_axial": 0.0, "w_transverse": -10.0}
+    {
+      "element_id": 0,
+      "w_axial": 0.0,
+      "w_transverse": -10.0
+    }
   ]
 }

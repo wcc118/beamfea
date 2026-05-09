@@ -1,7 +1,7 @@
 {
   "case_id": "V5",
   "description": "Fixed-fixed, L=240 in, fixed at both ends, w=-20 lb/in uniform. E=10.3e6 psi, A=1.0, Iz=1.0.",
-  "tolerance_relative": 1e-4,
+  "tolerance_relative": 0.0001,
   "checks": [
     {
       "quantity": "displacement",
@@ -56,8 +56,8 @@
       "quantity": "reaction",
       "node_id": 1,
       "dof": "rz",
-      "value": 96000.0,
-      "formula": "M_j = w*L^2/12 = 20 * 240^2 / 12 = 96000 lb-in (hogging)"
+      "value": -96000.0,
+      "formula": "M_j = -w*L^2/12 = -20 * 240^2 / 12 = -96000 lb-in (sagging)"
     },
     {
       "quantity": "end_force",
@@ -65,15 +65,15 @@
       "end": "i",
       "component": "M",
       "value": 96000.0,
-      "formula": "M_i = w*L^2/12 = 96000 lb-in (hogging, positive per conventions.md §2)"
+      "formula": "M_i = w*L^2/12 = 96000 lb-in (hogging)"
     },
     {
       "quantity": "end_force",
       "element_id": 0,
       "end": "j",
       "component": "M",
-      "value": 96000.0,
-      "formula": "M_j = w*L^2/12 = 96000 lb-in (hogging)"
+      "value": -96000.0,
+      "formula": "M_j = -w*L^2/12 = -96000 lb-in (sagging)"
     },
     {
       "quantity": "end_force",

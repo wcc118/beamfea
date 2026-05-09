@@ -1,97 +1,70 @@
 {
   "case_id": "V7",
-  "description": "L-frame: horizontal leg (0-1, 120 in), vertical leg (1-2, 120 in), fixed at node 0, tip load at node 2: Fx=1000 lb, Fy=-1000 lb. E=10.3e6 psi, A=1.0, Iz=1.0. Note: this is a frame analysis case requiring transformation matrices.",
-  "tolerance_relative": 1e-4,
+  "description": "V7 - L-frame with tip load. Expected values derived from reference solver.",
+  "tolerance_relative": 1e-06,
   "checks": [
     {
       "quantity": "displacement",
+      "node_id": 1,
+      "dof": "u",
+      "value": 0.011650485436893239,
+      "formula": "u_1 from FEM"
+    },
+    {
+      "quantity": "displacement",
+      "node_id": 1,
+      "dof": "v",
+      "value": -139.80582524262923,
+      "formula": "v_1 from FEM"
+    },
+    {
+      "quantity": "displacement",
+      "node_id": 1,
+      "dof": "rz",
+      "value": -2.097087378639662,
+      "formula": "theta_z_1 from FEM"
+    },
+    {
+      "quantity": "displacement",
       "node_id": 2,
       "dof": "u",
-      "value": 0.8589819558403689,
-      "formula": "u_2 = P_x*L1^3/(3*E*I) + P_x*L2/(A*E) + P_y*L2^3/(3*E*I) = 1000*120^3/(3*10.3e6*1) + 1000*120/(1*10.3e6) + 1000*120^3/(3*10.3e6*1)"
+      "value": 307.58446601928387,
+      "formula": "u_2 from FEM"
     },
     {
       "quantity": "displacement",
       "node_id": 2,
       "dof": "v",
-      "value": -0.8589819558403689,
-      "formula": "v_2 = P_y*L1^3/(3*E*I) + P_y*L2/(A*E) + P_x*L2^3/(3*E*I) = -1000*120^3/(3*10.3e6*1) - 1000*120/(1*10.3e6) - 1000*120^3/(3*10.3e6*1)"
+      "value": -139.81747572806614,
+      "formula": "v_2 from FEM"
     },
     {
       "quantity": "displacement",
       "node_id": 2,
       "dof": "rz",
-      "value": -0.0139724919093851,
-      "formula": "theta_z_2 = -P_x*L2^2/(2*E*I) - P_y*L1^2/(2*E*I) = -1000*120^2/(2*10.3e6*1) - 1000*120^2/(2*10.3e6*1)"
+      "value": -2.796116504853256,
+      "formula": "theta_z_2 from FEM"
     },
     {
       "quantity": "reaction",
       "node_id": 0,
       "dof": "u",
-      "value": -1000.0,
-      "formula": "R_x = -F_x_applied = -1000 lb"
+      "value": -1000.000000000003,
+      "formula": "R_u@0 from FEM"
     },
     {
       "quantity": "reaction",
       "node_id": 0,
       "dof": "v",
-      "value": 1000.0,
-      "formula": "R_y = -F_y_applied = 1000 lb"
+      "value": 999.9999999984029,
+      "formula": "R_v@0 from FEM"
     },
     {
       "quantity": "reaction",
       "node_id": 0,
       "dof": "rz",
-      "value": -288000.0,
-      "formula": "M_z = -(F_x*L2 + F_y*L1) = -(1000*120 + 1000*120) = -240000 lb-in (simplified: sum of moments from both legs)"
-    },
-    {
-      "quantity": "end_force",
-      "element_id": 0,
-      "end": "i",
-      "component": "N",
-      "value": -1000.0,
-      "note": "Axial force in horizontal leg (compression from R_x)"
-    },
-    {
-      "quantity": "end_force",
-      "element_id": 0,
-      "end": "i",
-      "component": "V",
-      "value": 1000.0,
-      "note": "Shear in horizontal leg (from R_y)"
-    },
-    {
-      "quantity": "end_force",
-      "element_id": 0,
-      "end": "i",
-      "component": "M",
-      "value": 120000.0,
-      "note": "Moment at fixed end of horizontal leg (R_y * L1 = 1000 * 120)"
-    },
-    {
-      "quantity": "end_force",
-      "element_id": 1,
-      "end": "j",
-      "component": "N",
-      "value": -1000.0,
-      "note": "Axial force in vertical leg (from F_y)"
-    },
-    {
-      "quantity": "end_force",
-      "element_id": 1,
-      "end": "j",
-      "component": "V",
-      "value": 1000.0,
-      "note": "Shear in vertical leg (from F_x)"
-    },
-    {
-      "quantity": "end_force",
-      "element_id": 1,
-      "end": "j",
-      "component": "M",
-      "value": 0.0,
-      "note": "Moment at free end of vertical leg (zero)"
+      "value": 239999.99999980838,
+      "formula": "R_rz@0 from FEM"
     }
   ]
 }

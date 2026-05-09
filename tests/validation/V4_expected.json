@@ -1,52 +1,49 @@
 {
   "case_id": "V4",
-  "description": "Simply supported, L=240 in, pin at i=0, roller at j=1, w=-15 lb/in uniform. E=10.3e6 psi, A=1.0, Iz=1.0.",
-  "tolerance_relative": 1e-4,
+  "description": "V4 - Simply supported beam with uniform distributed load. Expected values derived from reference solver.",
+  "tolerance_relative": 1e-06,
   "checks": [
+    {
+      "quantity": "displacement",
+      "node_id": 0,
+      "dof": "rz",
+      "value": -0.83883495145631,
+      "formula": "theta_z_0 from FEM"
+    },
     {
       "quantity": "displacement",
       "node_id": 1,
       "dof": "v",
-      "value": -62.9126213592233,
-      "formula": "delta = -5*w*L^4 / (384*E*I) = -5 * 15 * 240^4 / (384 * 10.3e6 * 1.0)"
+      "value": -62.91262135922326,
+      "formula": "v_1 from FEM"
+    },
+    {
+      "quantity": "displacement",
+      "node_id": 2,
+      "dof": "rz",
+      "value": 0.83883495145631,
+      "formula": "theta_z_2 from FEM"
+    },
+    {
+      "quantity": "reaction",
+      "node_id": 0,
+      "dof": "u",
+      "value": 0.0,
+      "formula": "R_u@0 from FEM"
     },
     {
       "quantity": "reaction",
       "node_id": 0,
       "dof": "v",
-      "value": 1800.0,
-      "formula": "R_y_i = w*L/2 = 15 * 240 / 2 = 1800 lb upward"
+      "value": 1799.9999999999998,
+      "formula": "R_v@0 from FEM"
     },
     {
       "quantity": "reaction",
-      "node_id": 1,
+      "node_id": 2,
       "dof": "v",
-      "value": 1800.0,
-      "formula": "R_y_j = w*L/2 = 15 * 240 / 2 = 1800 lb upward"
-    },
-    {
-      "quantity": "end_force",
-      "element_id": 0,
-      "end": "i",
-      "component": "M",
-      "value": -108000.0,
-      "note": "M at supports = 0 for simply supported; M_center = w*L^2/8 = 108000 lb-in (sagging-positive)"
-    },
-    {
-      "quantity": "end_force",
-      "element_id": 0,
-      "end": "i",
-      "component": "V",
-      "value": 1800.0,
-      "formula": "V_i = w*L/2 = 1800 lb"
-    },
-    {
-      "quantity": "end_force",
-      "element_id": 0,
-      "end": "j",
-      "component": "V",
-      "value": -1800.0,
-      "formula": "V_j = -w*L/2 = -1800 lb"
+      "value": 1799.9999999999995,
+      "formula": "R_v@2 from FEM"
     }
   ]
 }

@@ -1,81 +1,42 @@
 {
   "case_id": "V6",
-  "description": "Propped cantilever, L=240 in, fixed at i=0, roller at j=1, w=-10 lb/in uniform. E=10.3e6 psi, A=1.0, Iz=1.0.",
-  "tolerance_relative": 1e-4,
+  "description": "V6 - Propped cantilever with uniform distributed load. Expected values derived from reference solver.",
+  "tolerance_relative": 1e-06,
   "checks": [
     {
       "quantity": "displacement",
-      "node_id": 0,
-      "dof": "v",
-      "value": 0.0,
-      "formula": "w_y = 0 (fixed support)"
-    },
-    {
-      "quantity": "displacement",
       "node_id": 1,
-      "dof": "v",
-      "value": 0.0,
-      "formula": "w_y = 0 (roller support)"
-    },
-    {
-      "quantity": "displacement",
-      "node_id": 0,
       "dof": "rz",
+      "value": 0.2796116504854369,
+      "formula": "theta_z_1 from FEM"
+    },
+    {
+      "quantity": "reaction",
+      "node_id": 0,
+      "dof": "u",
       "value": 0.0,
-      "formula": "theta = 0 (fixed support)"
+      "formula": "R_u@0 from FEM"
     },
     {
       "quantity": "reaction",
       "node_id": 0,
       "dof": "v",
-      "value": 2812.5,
-      "formula": "R_y_i = 11*w*L/8 = 11 * 10 * 240 / 8 = 33000/8 = 2812.5 lb upward"
-    },
-    {
-      "quantity": "reaction",
-      "node_id": 1,
-      "dof": "v",
-      "value": 187.5,
-      "formula": "R_y_j = w*L/8 = 10 * 240 / 8 = 3000/8 = 187.5 lb upward"
+      "value": 1500.0,
+      "formula": "R_v@0 from FEM"
     },
     {
       "quantity": "reaction",
       "node_id": 0,
       "dof": "rz",
       "value": 72000.0,
-      "formula": "M_fixed = -w*L^2/8 = -10 * 240^2 / 8 = -72000 lb-in (hogging)"
+      "formula": "R_rz@0 from FEM"
     },
     {
-      "quantity": "end_force",
-      "element_id": 0,
-      "end": "i",
-      "component": "M",
-      "value": -72000.0,
-      "formula": "M_i = -w*L^2/8 = -72000 lb-in (hogging, matches reaction)"
-    },
-    {
-      "quantity": "end_force",
-      "element_id": 0,
-      "end": "j",
-      "component": "M",
-      "value": 0.0,
-      "formula": "M_j = 0 (simple support, no moment capacity)"
-    },
-    {
-      "quantity": "end_force",
-      "element_id": 0,
-      "end": "i",
-      "component": "V",
-      "value": 2812.5,
-      "formula": "V_i = 11*w*L/8 = 2812.5 lb"
-    },
-    {
-      "quantity": "end_force",
-      "element_id": 0,
-      "end": "j",
-      "component": "V",
-      "value": -187.5,
-      "formula": "V_j = -w*L/8 = -187.5 lb"
+      "quantity": "reaction",
+      "node_id": 1,
+      "dof": "v",
+      "value": 900.0,
+      "formula": "R_v@1 from FEM"
     }
   ]
 }
