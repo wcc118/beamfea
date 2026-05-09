@@ -16,6 +16,7 @@ from typing import Literal
 import matplotlib.pyplot as plt
 import numpy as np
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 from beamfea.postprocess import (
@@ -29,6 +30,14 @@ from beamfea.schema import Model
 from beamfea.solver import solve_linear_static
 
 app = FastAPI(title="beamfea API", version="0.1.0")
+
+# CORS middleware for browser access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # In-memory storage
 models: dict[str, Model] = {}

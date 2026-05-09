@@ -123,7 +123,7 @@
         </div>
     </div>
 
-    <!-- Modals -->
+    <!-- BC Modal -->
     <div id="bc-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">Boundary Conditions</div>
@@ -154,6 +154,7 @@
         </div>
     </div>
 
+    <!-- Load Modal -->
     <div id="load-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">Load</div>
@@ -188,17 +189,18 @@
 
     <input type="file" id="file-input" accept=".beamfea.json" style="display: none;">
 
-    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+
     <script>
         // API Configuration
         const API_BASE = 'http://localhost:1337';
         let currentModelId = null;
-        let currentModel = null;
         let nodes = [];
         let elements = [];
+        let bcs = [];
+        let nodalLoads = [];
         let selectedNodeId = null;
+        let clickState = null; // 'first' or 'second' node for element creation
 
-        // Initialize
         document.addEventListener('DOMContentLoaded', init);
 
         function init() {
@@ -231,8 +233,8 @@
             document.getElementById('save-btn').addEventListener('click', saveModel);
             document.getElementById('load-btn').addEventListener('click', () => document.getElementById('file-input').click());
             document.getElementById('file-input').addEventListener('change', loadModelFromFile);
-            document.getElementById('add-node-btn').addEventListener('click', () => addNode());
-            document.getElementById('add-element-btn').addEventListener('click', () => addElement());
+            document.getElementById('add-node-btn').addEventListener('click', addNodeClick);
+            document.getElementById('add-element-btn').addEventListener('click', addElementClick);
 
             // Modal controls
             document.getElementById('bc-cancel').addEventListener('click', () => toggleModal('bc-modal', false));
@@ -246,7 +248,34 @@
             document.getElementById('solve-btn').disabled = true;
 
             try {
-                const solveResp = await fetch(`${API_BASE}/solve/${currentModelId}`);
+                // Build model object from JS state
+                const model = {
+                    schema_version: "1.0",
+                    name: "Custom Model",
+                    nodes: nodes,
+                    materials: [{ id: 0, E: 10300000.0, nu: 0.33 }],
+                    elements: elements,
+                    bcs: bcs,
+                    nodal_loads: nodalLoads,
+                    element_loads: []
+                };
+
+                // POST to /model
+                const modelResp = await fetch(`${API_BASE}/model`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(model)
+                });
+
+                if (!modelResp.ok) {
+                    throw new Error(`Failed to post model: ${modelResp.status}`);
+                }
+
+                const modelData = await modelResp.json();
+                currentModelId = modelData.model_id;
+
+                // POST to /solve
+                const solveResp = await fetch(`${API_BASE}/solve/${currentModelId}`, {method: 'POST'});
                 if (!solveResp.ok) {
                     throw new Error(`Solve failed: ${solveResp.statusText}`);
                 }
@@ -328,8 +357,6 @@
                     if (resp.ok) {
                         const pngBlob = await resp.blob();
                         const url = URL.createObjectURL(pngBlob);
-                        const img = document.createElement('img');
-                        img.src = url;
 
                         const container = document.getElementById(`${type}-diagrams`);
                         const div = document.createElement('div');
@@ -341,43 +368,195 @@
             }
         }
 
-        function addNode() {
+        function addNodeClick() {
             const id = nodes.length;
             const node = { id, x: (id + 1) * 60, y: 0 };
             nodes.push(node);
+            clickState = null;
             updateModelTree();
             drawCanvas();
             saveBtnEnabled();
         }
 
-        function addElement() {
-            if (nodes.length < 2) {
-                alert('Need at least 2 nodes to create an element');
+        function addElementClick() {
+            if (clickState === null) {
+                alert('Click an existing node first, then click another node to create an element');
                 return;
             }
-            const id = elements.length;
-            elements.push({
-                id,
-                node_i: nodes.length - 2,
-                node_j: nodes.length - 1,
-                material_id: 0,
-                A: 1.0,
-                Iz: 1.0
-            });
+
+            if (clickState.type === 'node') {
+                const id = elements.length;
+                elements.push({
+                    id,
+                    node_i: clickState.nodeId,
+                    node_j: nodes.length > 0 ? nodes[nodes.length - 1].id : nodes.length - 1,
+                    material_id: 0,
+                    A: 1.0,
+                    Iz: 1.0
+                });
+                clickState = null;
+                updateModelTree();
+                drawCanvas();
+                saveBtnEnabled();
+            }
+        }
+
+        function handleCanvasClick(e) {
+            const canvas = document.getElementById('canvas');
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            // Inverse transform
+            let minX = Math.min(...nodes.map(n => n.x), 0);
+            let maxX = Math.max(...nodes.map(n => n.x), 100);
+            let minY = Math.min(...nodes.map(n => n.y), 0);
+            let maxY = Math.max(...nodes.map(n => n.y), 100);
+
+            if (minX === maxX) maxX = minX + 100;
+            if (minY === maxY) maxY = minY + 100;
+
+            const padding = 50;
+            const scale = Math.min(
+                (canvas.width - 2 * padding) / (maxX - minX),
+                (canvas.height - 2 * padding) / (maxY - minY)
+            );
+
+            const offsetX = padding + (canvas.width - 2 * padding) / 2 - (minX + maxX) / 2 * scale;
+            const offsetY = canvas.height - padding - (minY + maxY) / 2 * scale;
+
+            const worldX = (x - offsetX) / scale;
+            const worldY = -(y - offsetY) / scale;
+
+            // Find nearest node
+            let nearestNode = null;
+            let minDist = 20 / scale;
+
+            for (const node of nodes) {
+                const dist = Math.sqrt((node.x - worldX) ** 2 + (node.y - worldY) ** 2);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestNode = node;
+                }
+            }
+
+            if (nearestNode) {
+                selectNode(nearestNode.id, nearestNode.x, nearestNode.y);
+            } else {
+                // Clicked empty space - add new node
+                const id = nodes.length;
+                const node = { id, x: worldX, y: worldY };
+                nodes.push(node);
+                clickState = { type: 'node', nodeId: id };
+                updateModelTree();
+                drawCanvas();
+                saveBtnEnabled();
+                document.getElementById('status-bar').textContent = `Added node ${id} at (${worldX.toFixed(1)}, ${worldY.toFixed(1)})`;
+            }
+        }
+
+        function selectNode(id, x, y) {
+            selectedNodeId = id;
+            document.getElementById('bc-node-id').value = id;
+            document.getElementById('load-node-id').value = id;
+            clickState = { type: 'node', nodeId: id };
+            document.getElementById('status-bar').textContent = `Selected node ${id}`;
+        }
+
+        function handleRightClick(e) {
+            e.preventDefault();
+            const canvas = document.getElementById('canvas');
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            // Similar inverse transform
+            let minX = Math.min(...nodes.map(n => n.x), 0);
+            let maxX = Math.max(...nodes.map(n => n.x), 100);
+            let minY = Math.min(...nodes.map(n => n.y), 0);
+            let maxY = Math.max(...nodes.map(n => n.y), 100);
+
+            if (minX === maxX) maxX = minX + 100;
+            if (minY === maxY) maxY = minY + 100;
+
+            const padding = 50;
+            const scale = Math.min(
+                (canvas.width - 2 * padding) / (maxX - minX),
+                (canvas.height - 2 * padding) / (maxY - minY)
+            );
+
+            const offsetX = padding + (canvas.width - 2 * padding) / 2 - (minX + maxX) / 2 * scale;
+            const offsetY = canvas.height - padding - (minY + maxY) / 2 * scale;
+
+            const worldX = (x - offsetX) / scale;
+            const worldY = -(y - offsetY) / scale;
+
+            let nearestNode = null;
+            let minDist = 20 / scale;
+
+            for (const node of nodes) {
+                const dist = Math.sqrt((node.x - worldX) ** 2 + (node.y - worldY) ** 2);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestNode = node;
+                }
+            }
+
+            if (nearestNode) {
+                document.getElementById('load-node-id').value = nearestNode.id;
+                toggleModal('load-modal', true);
+            }
+        }
+
+        function toggleModal(id, show) {
+            const modal = document.getElementById(id);
+            if (show) {
+                modal.classList.add('active');
+            } else {
+                modal.classList.remove('active');
+            }
+        }
+
+        function saveBc() {
+            const nodeId = parseInt(document.getElementById('bc-node-id').value);
+            const dof = document.getElementById('bc-dof').value;
+            const value = parseFloat(document.getElementById('bc-value').value);
+
+            // Add BC to bcs array
+            const bc = { node_id: nodeId, dof, value };
+            bcs.push(bc);
+
             updateModelTree();
             drawCanvas();
-            saveBtnEnabled();
+            toggleModal('bc-modal', false);
+            document.getElementById('status-bar').textContent = `Added BC at node ${nodeId}, ${dof}=${value}`;
+        }
+
+        function saveLoad() {
+            const nodeId = parseInt(document.getElementById('load-node-id').value);
+            const Fx = parseFloat(document.getElementById('load-fx').value);
+            const Fy = parseFloat(document.getElementById('load-fy').value);
+            const Mz = parseFloat(document.getElementById('load-mz').value);
+
+            // Add load to nodalLoads array
+            const load = { node_id: nodeId, Fx: isNaN(Fx) ? 0 : Fx, Fy: isNaN(Fy) ? 0 : Fy, Mz: isNaN(Mz) ? 0 : Mz };
+            nodalLoads.push(load);
+
+            updateModelTree();
+            drawCanvas();
+            toggleModal('load-modal', false);
+            document.getElementById('status-bar').textContent = `Added load at node ${nodeId}`;
         }
 
         function saveModel() {
             const model = {
                 schema_version: "1.0",
                 name: "Custom Model",
-                nodes,
+                nodes: nodes,
                 materials: [{ id: 0, E: 10300000.0, nu: 0.33 }],
-                elements,
-                bcs: [],
-                nodal_loads: [],
+                elements: elements,
+                bcs: bcs,
+                nodal_loads: nodalLoads,
                 element_loads: []
             };
 
@@ -400,6 +579,8 @@
                 const model = JSON.parse(text);
                 nodes = model.nodes || [];
                 elements = model.elements || [];
+                bcs = model.bcs || [];
+                nodalLoads = model.nodal_loads || [];
 
                 // POST to server
                 const resp = await fetch(`${API_BASE}/model`, {
@@ -411,6 +592,7 @@
                 if (resp.ok) {
                     const data = await resp.json();
                     currentModelId = data.model_id;
+                    clickState = null;
                     updateModelTree();
                     drawCanvas();
                     saveBtnEnabled();
@@ -425,24 +607,32 @@
 
         function updateModelTree() {
             const tree = document.getElementById('model-tree');
-            let html = '<div class="tree-node expanded"><span class="toggle">B</span>Nodes</div><div style="padding-left: 20px;">';
+            let html = '<div class="tree-node expanded"><span class="toggle">▼</span>Nodes</div><div style="padding-left: 20px;">';
             for (const node of nodes) {
-                html += `<div class="tree-node" data-type="node" data-id="${node.id}" data-node-x="${node.x}" data-node-y="${node.y}">Node ${node.id}: (${node.x}, ${node.y})</div>`;
+                html += `<div class="tree-node" data-type="node" data-id="${node.id}" data-node-x="${node.x}" data-node-y="${node.y}">Node ${node.id}: (${node.x.toFixed(1)}, ${node.y.toFixed(1)})</div>`;
             }
             html += '</div>';
 
-            html += '<div class="tree-node"><span class="toggle">C</span>Elements</div><div style="padding-left: 20px;">';
+            html += '<div class="tree-node"><span class="toggle">▶</span>Elements</div><div style="padding-left: 20px;">';
             for (const elem of elements) {
-                html += `<div class="tree-node">Element ${elem.id}: Node ${elem.node_i} => ${elem.node_j}</div>`;
+                html += `<div class="tree-node">Element ${elem.id}: Node ${elem.node_i} -> ${elem.node_j}</div>`;
             }
             html += '</div>';
 
-            html += '<div class="tree-node"><span class="toggle">C</span>Materials</div><div style="padding-left: 20px;">';
-            html += '<div class="tree-node">Material 0: E=10.3e6, nu=0.33</div>';
+            html += '<div class="tree-node"><span class="toggle">▶</span>BCs</div><div style="padding-left: 20px;">';
+            for (const bc of bcs) {
+                html += `<div class="tree-node">Node ${bc.node_id}, ${bc.dof} = ${bc.value}</div>`;
+            }
             html += '</div>';
 
-            html += '<div class="tree-node"><span class="toggle">C</span>BCs</div><div style="padding-left: 20px;"></div>';
-            html += '<div class="tree-node"><span class="toggle">C</span>Loads</div><div style="padding-left: 20px;"></div>';
+            html += '<div class="tree-node"><span class="toggle">▶</span>Loads</div><div style="padding-left: 20px;">';
+            for (const load of nodalLoads) {
+                const fx = load.Fx || 0;
+                const fy = load.Fy || 0;
+                const mz = load.Mz || 0;
+                html += `<div class="tree-node">Node ${load.node_id}: Fx=${fx}, Fy=${fy}, Mz=${mz}</div>`;
+            }
+            html += '</div>';
 
             tree.innerHTML = html;
 
@@ -466,59 +656,11 @@
             });
         }
 
-        function selectNode(id, x, y) {
-            selectedNodeId = id;
-            document.getElementById('bc-node-id').value = id;
-            document.getElementById('load-node-id').value = id;
-            toggleModal('bc-modal', true);
-        }
-
-        function toggleModal(id, show) {
-            const modal = document.getElementById(id);
-            if (show) {
-                modal.classList.add('active');
-            } else {
-                modal.classList.remove('active');
-            }
-        }
-
-        function saveBc() {
-            const nodeId = parseInt(document.getElementById('bc-node-id').value);
-            const dof = document.getElementById('bc-dof').value;
-            const value = parseFloat(document.getElementById('bc-value').value);
-
-            // Add BC to current model in memory
-            const bc = { node_id: nodeId, dof, value };
-
-            // Update tree
-            updateModelTree();
-
-            // Update canvas
-            drawCanvas();
-
-            toggleModal('bc-modal', false);
-        }
-
-        function saveLoad() {
-            const nodeId = parseInt(document.getElementById('load-node-id').value);
-            const Fx = parseFloat(document.getElementById('load-fx').value);
-            const Fy = parseFloat(document.getElementById('load-fy').value);
-            const Mz = parseFloat(document.getElementById('load-mz').value);
-
-            // Add load to current model in memory
-            const load = { node_id: nodeId, Fx, Fy, Mz };
-
-            // Update tree
-            updateModelTree();
-
-            toggleModal('load-modal', false);
-        }
-
         function saveBtnEnabled() {
             const saveBtn = document.getElementById('save-btn');
             const solveBtn = document.getElementById('solve-btn');
-            saveBtn.disabled = !currentModelId || nodes.length === 0;
-            solveBtn.disabled = !currentModelId;
+            saveBtn.disabled = nodes.length === 0;
+            solveBtn.disabled = nodes.length === 0;
         }
 
         function drawCanvas() {
@@ -536,20 +678,20 @@
                 ctx.fillStyle = '#999';
                 ctx.font = '16px sans-serif';
                 ctx.textAlign = 'center';
-                ctx.fillText('Click "Add Node" to start', canvas.width / 2, canvas.height / 2);
+                ctx.fillText('Click on canvas to place nodes', canvas.width / 2, canvas.height / 2);
                 return;
             }
 
             // Calculate scale and offset
-            let minX = Math.min(...nodes.map(n => n.x));
-            let maxX = Math.max(...nodes.map(n => n.x));
-            let minY = Math.min(...nodes.map(n => n.y));
-            let maxY = Math.max(...nodes.map(n => n.y));
+            let minX = Math.min(...nodes.map(n => n.x), 0);
+            let maxX = Math.max(...nodes.map(n => n.x), 100);
+            let minY = Math.min(...nodes.map(n => n.y), 0);
+            let maxY = Math.max(...nodes.map(n => n.y), 100);
 
             const padding = 50;
             const scale = Math.min(
-                (canvas.width - 2 * padding) / (maxX - minX || 100),
-                (canvas.height - 2 * padding) / (maxY - minY || 100)
+                (canvas.width - 2 * padding) / (maxX - minX || 1),
+                (canvas.height - 2 * padding) / (maxY - minY || 1)
             );
 
             const offsetX = padding + (canvas.width - 2 * padding) / 2 - (minX + maxX) / 2 * scale;
@@ -597,95 +739,6 @@
                 ctx.font = '11px sans-serif';
                 ctx.textAlign = 'center';
                 ctx.fillText(node.id, p.x, p.y + 20);
-            }
-        }
-
-        function handleCanvasClick(e) {
-            const canvas = document.getElementById('canvas');
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            // Inverse transform
-            let minX = Math.min(...nodes.map(n => n.x));
-            let maxX = Math.max(...nodes.map(n => n.x));
-            let minY = Math.min(...nodes.map(n => n.y));
-            let maxY = Math.max(...nodes.map(n => n.y));
-
-            if (minX === maxX) maxX = minX + 100;
-            if (minY === maxY) maxY = minY + 100;
-
-            const padding = 50;
-            const scale = Math.min(
-                (canvas.width - 2 * padding) / (maxX - minX),
-                (canvas.height - 2 * padding) / (maxY - minY)
-            );
-
-            const offsetX = padding + (canvas.width - 2 * padding) / 2 - (minX + maxX) / 2 * scale;
-            const offsetY = canvas.height - padding - (minY + maxY) / 2 * scale;
-
-            const worldX = (x - offsetX) / scale;
-            const worldY = -(y - offsetY) / scale;
-
-            // Find nearest node
-            let nearestNode = null;
-            let minDist = 20 / scale;
-
-            for (const node of nodes) {
-                const dist = Math.sqrt((node.x - worldX) ** 2 + (node.y - worldY) ** 2);
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearestNode = node;
-                }
-            }
-
-            if (nearestNode) {
-                selectNode(nearestNode.id, nearestNode.x, nearestNode.y);
-            }
-        }
-
-        function handleRightClick(e) {
-            e.preventDefault();
-            const canvas = document.getElementById('canvas');
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            // Similar inverse transform
-            let minX = Math.min(...nodes.map(n => n.x));
-            let maxX = Math.max(...nodes.map(n => n.x));
-            let minY = Math.min(...nodes.map(n => n.y));
-            let maxY = Math.max(...nodes.map(n => n.y));
-
-            if (minX === maxX) maxX = minX + 100;
-            if (minY === maxY) maxY = minY + 100;
-
-            const padding = 50;
-            const scale = Math.min(
-                (canvas.width - 2 * padding) / (maxX - minX),
-                (canvas.height - 2 * padding) / (maxY - minY)
-            );
-
-            const offsetX = padding + (canvas.width - 2 * padding) / 2 - (minX + maxX) / 2 * scale;
-            const offsetY = canvas.height - padding - (minY + maxY) / 2 * scale;
-
-            const worldX = (x - offsetX) / scale;
-            const worldY = -(y - offsetY) / scale;
-
-            let nearestNode = null;
-            let minDist = 20 / scale;
-
-            for (const node of nodes) {
-                const dist = Math.sqrt((node.x - worldX) ** 2 + (node.y - worldY) ** 2);
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearestNode = node;
-                }
-            }
-
-            if (nearestNode) {
-                document.getElementById('load-node-id').value = nearestNode.id;
-                toggleModal('load-modal', true);
             }
         }
     </script>
