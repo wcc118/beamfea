@@ -5,71 +5,91 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>beamfea - Planar Beam FEA</title>
     <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-        header { background: #2c3e50; color: white; padding: 10px 20px; }
-        header h1 { margin: 0; font-size: 1.2rem; }
-        .container { display: flex; height: calc(100vh - 40px); }
-        .pane { border: 1px solid #ccc; overflow: auto; padding: 10px; }
-        .left { flex: 0 0 250px; background: #f8f9fa; }
-        .center { flex: 1; background: #fff; position: relative; }
-        .right { flex: 0 0 300px; background: #f8f9fa; }
-        .pane-title { background: #e9ecef; padding: 8px; margin: -10px -10px 10px -10px; font-weight: bold; border-bottom: 1px solid #ddd; }
-        .tree-node { padding: 4px 8px; margin: 2px 0; background: #fff; border-radius: 4px; border: 1px solid #dee2e6; font-size: 0.9rem; cursor: pointer; }
-        .tree-node:hover { background: #e2e6ea; }
-        .tree-node.expanded { background: #e9ecef; }
-        .tree-node > .toggle { user-select: none; width: 20px; display: inline-block; text-align: center; }
-        .tree-content { display: block; padding-left: 20px; }
-        .canvas-container { width: 100%; height: calc(100% - 60px); position: relative; }
-        .mode-bar { position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10; display: flex; gap: 5px; }
-        .mode-btn { padding: 6px 12px; border: 1px solid #ddd; background: #f0f0f0; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        header { background: #2c3e50; color: white; padding: 8px 20px; flex: 0 0 auto; }
+        header h1 { font-size: 1.2rem; }
+        .container { display: flex; flex: 1; min-height: 0; }
+        .pane { border: 1px solid #ccc; overflow: auto; }
+        .left { flex: 0 0 250px; background: #f8f9fa; display: flex; flex-direction: column; padding: 0; }
+        .center { flex: 1; background: #fff; display: flex; flex-direction: column; min-width: 0; padding: 0; }
+        .right { flex: 0 0 340px; background: #f8f9fa; display: flex; flex-direction: column; padding: 0; }
+        .pane-title { background: #e9ecef; padding: 8px 10px; font-weight: bold; border-bottom: 1px solid #ddd; flex: 0 0 auto; }
+        .center .pane-title { display: flex; align-items: center; justify-content: space-between; }
+        #model-tree { flex: 1; overflow: auto; padding: 6px; }
+        .tree-section { margin-bottom: 4px; }
+        .tree-header { padding: 5px 8px; background: #e9ecef; border: 1px solid #dee2e6; border-radius: 4px; font-size: 0.9rem; font-weight: 600; cursor: pointer; user-select: none; }
+        .tree-header:hover { background: #dee2e6; }
+        .tree-header .toggle { display: inline-block; width: 16px; text-align: center; }
+        .tree-body { padding-left: 14px; }
+        .tree-body.collapsed { display: none; }
+        .tree-item { padding: 3px 8px; margin: 2px 0; background: #fff; border: 1px solid #e9ecef; border-radius: 3px; font-size: 0.82rem; display: flex; align-items: center; justify-content: space-between; }
+        .tree-item:hover { background: #f0f4f8; }
+        .tree-item.selected { background: #d4e6f9; border-color: #3498db; }
+        .tree-item-label { flex: 1; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tree-item-actions { display: flex; gap: 3px; flex-shrink: 0; }
+        .btn-xs { padding: 1px 5px; font-size: 11px; border: none; border-radius: 3px; cursor: pointer; line-height: 1.4; }
+        .btn-edit { background: #f39c12; color: #fff; }
+        .btn-del  { background: #e74c3c; color: #fff; }
+        .btn-xs:hover { opacity: 0.8; }
+        .tree-bottom { flex: 0 0 auto; padding: 8px; border-top: 1px solid #ddd; display: flex; gap: 6px; }
+        .mode-bar { display: flex; gap: 4px; }
+        .mode-btn { padding: 4px 10px; border: 1px solid #ccc; background: #f0f0f0; border-radius: 4px; cursor: pointer; font-size: 0.8rem; color: #333; }
         .mode-btn.active { background: #3498db; color: white; border-color: #2980b9; }
         .mode-btn:hover:not(.active) { background: #e0e0e0; }
-        canvas { display: block; }
-        .controls { padding: 10px; border-bottom: 1px solid #ddd; }
-        button { padding: 8px 16px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .canvas-wrap { flex: 1; position: relative; min-height: 0; }
+        canvas { display: block; width: 100%; height: 100%; }
+        .overlay-bar { position: absolute; top: 6px; right: 6px; background: rgba(255,255,255,0.92); border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.15); padding: 4px 8px; font-size: 0.75rem; display: flex; gap: 8px; align-items: center; z-index: 5; }
+        .zoom-rect { position: absolute; border: 2px dashed #3498db; background: rgba(52,152,219,0.08); pointer-events: none; z-index: 4; }
+        .overlay-bar label { cursor: pointer; display: flex; align-items: center; gap: 3px; }
+        .overlay-bar input[type=checkbox] { margin: 0; }
+        .status-bar { flex: 0 0 auto; padding: 4px 10px; background: #e9ecef; font-size: 0.8rem; display: flex; gap: 16px; }
+        .status-bar .mode-label { font-weight: bold; color: #2980b9; }
+        .status-bar .help-text { color: #555; }
+        .status-bar .snap-coords { color: #888; margin-left: auto; }
+        .results-controls { flex: 0 0 auto; padding: 8px 10px; border-bottom: 1px solid #ddd; }
+        .tab-nav { display: flex; flex-wrap: wrap; border-bottom: 1px solid #ccc; flex: 0 0 auto; }
+        .tab-btn { flex: 0 1 auto; padding: 6px 8px; background: #e9ecef; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-size: 0.76rem; }
+        .tab-btn.active { background: #fff; border-bottom-color: #3498db; font-weight: 600; }
+        .tab-btn:hover:not(.active) { background: #dde; }
+        .tab-content { display: none; padding: 8px; overflow: auto; flex: 1; min-height: 0; }
+        .tab-content.active { display: block; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .data-table th { background: #e9ecef; text-align: left; padding: 3px 5px; border-bottom: 1px solid #dee2e6; position: sticky; top: 0; }
+        .data-table td { padding: 2px 5px; border-bottom: 1px solid #f1f1f1; font-family: 'SF Mono','Consolas',monospace; font-size: 0.78rem; }
+        .data-table tr:hover td { background: #f7f9fc; }
+        .diagram { text-align: center; margin-bottom: 12px; }
+        .diagram img { max-width: 100%; border: 1px solid #dee2e6; border-radius: 4px; }
+        button { padding: 6px 14px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
         button:hover { background: #2980b9; }
         button:disabled { background: #bdc3c7; cursor: not-allowed; }
-        .tab-nav { display: flex; border-bottom: 1px solid #ccc; background: #f8f9fa; }
-        .tab-btn { flex: 1; padding: 10px; background: #e9ecef; border: none; border-bottom: 2px solid transparent; cursor: pointer; }
-        .tab-btn.active { background: #fff; border-bottom-color: #3498db; }
-        .tab-content { display: none; padding: 10px; }
-        .tab-content.active { display: block; }
-        .data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        .data-table th { background: #e9ecef; text-align: left; padding: 4px 8px; border-bottom: 1px solid #dee2e6; }
-        .data-table td { padding: 4px 8px; border-bottom: 1px solid #f1f1f1; }
-        .data-table tr:last-child td { border-bottom: none; }
-        .diagram { text-align: center; margin-bottom: 15px; }
-        .diagram img { max-width: 100%; border: 1px solid #dee2e6; }
-        .status-bar { padding: 5px 10px; background: #e9ecef; font-size: 0.8rem; display: flex; flex-direction: column; }
-        .mode-label { font-weight: bold; color: #2980b9; }
-        .help-text { color: #666; font-size: 0.8rem; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.45); z-index: 1000; }
         .modal.active { display: flex; align-items: center; justify-content: center; }
-        .modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; }
-        .modal-header { margin-bottom: 15px; font-weight: bold; }
-        .modal-body { margin-bottom: 20px; }
-        .modal-footer { text-align: right; }
+        .modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 420px; box-shadow: 0 8px 32px rgba(0,0,0,0.25); }
+        .modal-header { margin-bottom: 14px; font-weight: bold; font-size: 1rem; }
+        .modal-body { margin-bottom: 16px; }
+        .modal-footer { display: flex; gap: 8px; justify-content: flex-end; }
         .field { margin-bottom: 10px; }
-        .field label { display: block; margin-bottom: 4px; font-size: 0.9rem; }
-        .field input, .field select { width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; }
+        .field label { display: block; margin-bottom: 3px; font-size: 0.85rem; font-weight: 500; }
+        .field input, .field select { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
         .field-group { display: flex; gap: 10px; }
         .field-group .field { flex: 1; }
-        .bc-icon { display: inline-block; width: 20px; height: 20px; vertical-align: middle; margin-right: 8px; }
-        .load-icon { display: inline-block; width: 20px; height: 20px; vertical-align: middle; margin-right: 8px; }
+        .nf-row { display: flex; gap: 4px; align-items: center; padding: 2px 0; font-size: 0.8rem; border-bottom: 1px solid #f0f0f0; }
+        .nf-row input[type=checkbox] { margin: 0; flex-shrink: 0; }
+        .nf-row .nf-label { flex: 1; }
+        .nf-row .nf-vals { font-family: 'SF Mono','Consolas',monospace; font-size: 0.78rem; display: flex; gap: 6px; }
+        .nf-sum { font-weight: 600; border-top: 2px solid #333; padding-top: 4px; margin-top: 4px; }
     </style>
 </head>
 <body>
-    <header>
-        <h1>beamfea - Planar Beam FEA</h1>
-    </header>
+    <header><h1>beamfea - Planar Beam FEA</h1></header>
     <div class="container">
         <div class="pane left">
             <div class="pane-title">Model Tree</div>
             <div id="model-tree"></div>
-            <div style="margin-top: 20px;">
-                <button id="save-btn" disabled>Save Model</button>
-                <button id="load-btn">Load Model</button>
+            <div class="tree-bottom">
+                <button id="save-btn" disabled style="flex:1">Save</button>
+                <button id="load-btn" style="flex:1">Load</button>
             </div>
         </div>
         <div class="pane center">
@@ -77,816 +97,862 @@
                 <span>Canvas</span>
                 <div class="mode-bar">
                     <button class="mode-btn active" data-mode="select">Select</button>
-                    <button class="mode-btn" data-mode="add-node">Add Node</button>
-                    <button class="mode-btn" data-mode="add-element">Add Element</button>
-                    <button class="mode-btn" data-mode="add-bc">Add BC</button>
-                    <button class="mode-btn" data-mode="add-load">Add Load</button>
+                    <button class="mode-btn" data-mode="add-node">+ Node</button>
+                    <button class="mode-btn" data-mode="add-element">+ Element</button>
+                    <button class="mode-btn" data-mode="add-bc">+ BC</button>
+                    <button class="mode-btn" data-mode="add-load">+ Load</button>
+                    <span style="border-left:1px solid #ccc;margin:0 2px"></span>
+                    <button class="mode-btn" data-mode="zoom-box">Zoom Box</button>
+                    <button class="mode-btn" id="fit-btn" style="background:#27ae60;color:#fff;border-color:#229954">Fit</button>
                 </div>
             </div>
-            <div class="canvas-container">
+            <div class="canvas-wrap">
                 <canvas id="canvas"></canvas>
+                <div id="zoom-rect" class="zoom-rect" style="display:none"></div>
+                <div class="overlay-bar" id="overlay-bar" style="display:none">
+                    <label><input type="checkbox" id="chk-defl" checked> Deflected</label>
+                    <label><input type="checkbox" id="chk-react" checked> Reactions</label>
+                    <label><input type="checkbox" id="chk-smd" checked> SMD</label>
+                    <label><input type="checkbox" id="chk-maxima" checked> Maxima</label>
+                    <span id="defl-scale-label" style="color:#666"></span>
+                </div>
             </div>
-            <div class="status-bar">
+            <div class="status-bar" id="status-bar">
                 <span class="mode-label" id="mode-label">Mode: Select</span>
-                <span class="help-text" id="help-text">Click node to select, or use toolbar buttons</span>
+                <span class="help-text" id="help-text"></span>
                 <span class="snap-coords" id="snap-coords"></span>
             </div>
         </div>
         <div class="pane right">
             <div class="pane-title">Results</div>
-            <div class="controls">
-                <button id="solve-btn" disabled>Solve</button>
+            <div class="results-controls">
+                <button id="solve-btn" disabled style="width:100%">Solve</button>
             </div>
             <div class="tab-nav">
-                <button class="tab-btn active" data-tab="deflection">Deflection</button>
+                <button class="tab-btn active" data-tab="deflection">Deflect.</button>
+                <button class="tab-btn" data-tab="reactions">React.</button>
+                <button class="tab-btn" data-tab="nodeforces">Node F</button>
                 <button class="tab-btn" data-tab="shear">Shear</button>
                 <button class="tab-btn" data-tab="moment">Moment</button>
                 <button class="tab-btn" data-tab="axial">Axial</button>
-                <button class="tab-btn" data-tab="reactions">Reactions</button>
-                <button class="tab-btn" data-tab="gpf">GPF</button>
                 <button class="tab-btn" data-tab="maxima">Maxima</button>
             </div>
             <div id="tab-deflection" class="tab-content active">
-                <h3 style="margin: 0 0 10px 0;">Deflected Shape</h3>
-                <div class="diagram" id="deflection-diagram">
-                    <div>Click Solve to see results</div>
-                </div>
-            </div>
-            <div id="tab-shear" class="tab-content">
-                <h3 style="margin: 0 0 10px 0;">Shear Force Diagrams</h3>
-                <div id="shear-diagrams"></div>
-            </div>
-            <div id="tab-moment" class="tab-content">
-                <h3 style="margin: 0 0 10px 0;">Bending Moment Diagrams</h3>
-                <div id="moment-diagrams"></div>
-            </div>
-            <div id="tab-axial" class="tab-content">
-                <h3 style="margin: 0 0 10px 0;">Axial Force Diagrams</h3>
-                <div id="axial-diagrams"></div>
+                <div id="deflection-table"><em>Click Solve to see results</em></div>
             </div>
             <div id="tab-reactions" class="tab-content">
-                <h3 style="margin: 0 0 10px 0;">Reactions</h3>
                 <div id="reactions-table"></div>
             </div>
-            <div id="tab-gpf" class="tab-content">
-                <h3 style="margin: 0 0 10px 0;">Grid Point Force Balance</h3>
-                <div id="gpf-table"></div>
+            <div id="tab-nodeforces" class="tab-content">
+                <div id="nodeforces-content"><em>Select a node on the canvas, then Solve</em></div>
             </div>
-            <div id="tab-maxima" class="tab-content">
-                <h3 style="margin: 0 0 10px 0;">Maxima</h3>
-                <div id="maxima-values"></div>
-            </div>
+            <div id="tab-shear" class="tab-content"><div id="shear-diagrams"></div></div>
+            <div id="tab-moment" class="tab-content"><div id="moment-diagrams"></div></div>
+            <div id="tab-axial" class="tab-content"><div id="axial-diagrams"></div></div>
+            <div id="tab-maxima" class="tab-content"><div id="maxima-values"></div></div>
         </div>
     </div>
 
     <!-- BC Modal -->
-    <div id="bc-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">Add Boundary Condition</div>
-            <div class="modal-body">
-                <div class="field-group">
-                    <div class="field">
-                        <label>Node ID</label>
-                        <input type="number" id="bc-node-id" readonly>
-                    </div>
-                    <div class="field">
-                        <label>DOF</label>
-                        <select id="bc-dof">
-                            <option value="u">u (x translation)</option>
-                            <option value="v">v (y translation)</option>
-                            <option value="rz">rz (rotation about z)</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="field">
-                    <label>Value</label>
-                    <input type="number" id="bc-value" value="0" step="any">
-                </div>
+    <div id="bc-modal" class="modal"><div class="modal-content">
+        <div class="modal-header" id="bc-modal-title">Add Boundary Condition</div>
+        <div class="modal-body">
+            <div class="field-group">
+                <div class="field"><label>Node ID</label><input type="number" id="bc-node-id" readonly></div>
+                <div class="field"><label>DOF</label><select id="bc-dof">
+                    <option value="u">u (axial)</option><option value="v">v (transverse)</option><option value="rz">rz (rotation)</option>
+                </select></div>
             </div>
-            <div class="modal-footer">
-                <button id="bc-save">Add BC</button>
-                <button id="bc-cancel">Cancel</button>
-            </div>
+            <div class="field"><label>Prescribed value</label><input type="number" id="bc-value" value="0" step="any"></div>
         </div>
-    </div>
+        <div class="modal-footer"><button id="bc-save">Save</button><button id="bc-cancel" style="background:#6c757d">Cancel</button></div>
+    </div></div>
 
     <!-- Load Modal -->
-    <div id="load-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">Add Nodal Load</div>
-            <div class="modal-body">
-                <div class="field-group">
-                    <div class="field">
-                        <label>Node ID</label>
-                        <input type="number" id="load-node-id" readonly>
-                    </div>
-                </div>
-                <div class="field-group">
-                    <div class="field">
-                        <label>Fx (lb)</label>
-                        <input type="number" id="load-fx" value="0">
-                    </div>
-                    <div class="field">
-                        <label>Fy (lb)</label>
-                        <input type="number" id="load-fy" value="0">
-                    </div>
-                    <div class="field">
-                        <label>Mz (lb-in)</label>
-                        <input type="number" id="load-mz" value="0">
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="load-save">Add Load</button>
-                <button id="load-cancel">Cancel</button>
+    <div id="load-modal" class="modal"><div class="modal-content">
+        <div class="modal-header" id="load-modal-title">Add Nodal Load</div>
+        <div class="modal-body">
+            <div class="field"><label>Node ID</label><input type="number" id="load-node-id" readonly></div>
+            <div class="field-group">
+                <div class="field"><label>Fx (lb)</label><input type="number" id="load-fx" value="0" step="any"></div>
+                <div class="field"><label>Fy (lb)</label><input type="number" id="load-fy" value="0" step="any"></div>
+                <div class="field"><label>Mz (lb-in)</label><input type="number" id="load-mz" value="0" step="any"></div>
             </div>
         </div>
-    </div>
-
-    <input type="file" id="file-input" accept=".beamfea.json" style="display: none;">
-
-    <script>
-        // API Configuration
-        const API_BASE = 'http://localhost:1337';
-        let currentModelId = null;
-        let nodes = [];
-        let elements = [];
-        let bcs = [];
-        let nodalLoads = [];
-        let selectedNodeId = null;
-        let addElementState = null; // {nodeId, x, y} of first node
-        let clickMode = 'select'; // select, add-node, add-element, add-bc, add-load
-
-        // Canvas scaling: 1 inch = 4 pixels, fixed viewport 0 to 300 inches
-        const SCALE = 4; // pixels per inch
-        const CANVAS_MIN_X = 0;
-        const CANVAS_MAX_X = 300;
-        const CANVAS_MIN_Y = 0;
-        const CANVAS_MAX_Y = 200;
-        const GRID_MAJOR = 12; // inches
-        const GRID_MINOR = 1; // inches
-
-        document.addEventListener('DOMContentLoaded', init);
-
-        function init() {
-            setupEventListeners();
-            resizeCanvas();
-            updateModelTree();
-        }
-
-        function resizeCanvas() {
-            const container = document.querySelector('.canvas-container');
-            const canvas = document.getElementById('canvas');
-            canvas.width = container.clientWidth;
-            canvas.height = container.clientHeight - 40;
-        }
-
-        function setupEventListeners() {
-            // Tab switching
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                    btn.classList.add('active');
-                    const tab = btn.dataset.tab;
-                    document.getElementById(`tab-${tab}`).classList.add('active');
-                });
-            });
-
-            // Mode buttons
-            document.querySelectorAll('.mode-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    clickMode = btn.dataset.mode;
-                    updateModeLabel();
-                });
-            });
-
-            // Canvas events
-            const canvas = document.getElementById('canvas');
-            canvas.addEventListener('click', handleCanvasClick);
-            window.addEventListener('resize', resizeCanvas);
-            window.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    clickMode = 'select';
-                    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                    document.querySelector('[data-mode="select"]').classList.add('active');
-                    updateModeLabel();
-                    e.stopPropagation();
-                    e.preventDefault();
-                }
-            });
-
-            // Buttons
-            document.getElementById('solve-btn').addEventListener('click', solveModel);
-            document.getElementById('save-btn').addEventListener('click', saveModel);
-            document.getElementById('load-btn').addEventListener('click', () => document.getElementById('file-input').click());
-            document.getElementById('file-input').addEventListener('change', loadModelFromFile);
-
-            // Modal controls
-            document.getElementById('bc-cancel').addEventListener('click', () => toggleModal('bc-modal', false));
-            document.getElementById('load-cancel').addEventListener('click', () => toggleModal('load-modal', false));
-            document.getElementById('bc-save').addEventListener('click', saveBc);
-            document.getElementById('load-save').addEventListener('click', saveLoad);
-        }
-
-        function updateModeLabel() {
-            const labels = {
-                'select': 'Select - Click node to select',
-                'add-node': 'Add Node - Click on canvas to place',
-                'add-element': 'Add Element - Click two nodes',
-                'add-bc': 'Add BC - Click node',
-                'add-load': 'Add Load - Click node'
-            };
-            document.getElementById('mode-label').textContent = `Mode: ${labels[clickMode]}`;
-            document.getElementById('help-text').textContent = clickMode === 'add-node' ? 'Snap to 1-inch grid. X=Right, Y=Up' :
-                clickMode === 'add-element' ? 'Click first node, then second node' :
-                clickMode === 'add-bc' ? 'Select DOF and value in modal' :
-                clickMode === 'add-load' ? 'Enter force values in modal' : '';
-        }
-
-        async function solveModel() {
-            document.getElementById('status-bar').textContent = 'Solving...';
-            document.getElementById('solve-btn').disabled = true;
-
-            try {
-                const model = buildModel();
-                const resp = await fetch(`${API_BASE}/model`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(model)
-                });
-
-                if (!resp.ok) throw new Error(`Failed to post model: ${resp.status}`);
-                const data = await resp.json();
-                currentModelId = data.model_id;
-
-                const solveResp = await fetch(`${API_BASE}/solve/${currentModelId}`, {method: 'POST'});
-                if (!solveResp.ok) throw new Error(`Solve failed: ${solveResp.statusText}`);
-
-                const resultsResp = await fetch(`${API_BASE}/results/${currentModelId}`);
-                if (!resultsResp.ok) throw new Error(`Failed to fetch results: ${resultsResp.statusText}`);
-
-                const results = await resultsResp.json();
-                showResults(results);
-                document.getElementById('status-bar').textContent = 'Solved successfully';
-            } catch (err) {
-                document.getElementById('status-bar').textContent = `Error: ${err.message}`;
-                alert(err.message);
-            } finally {
-                document.getElementById('solve-btn').disabled = false;
-            }
-        }
-
-        function buildModel() {
-            return {
-                schema_version: "1.0",
-                name: "Custom Model",
-                nodes: nodes,
-                materials: [{ id: 0, E: 10300000.0, nu: 0.33 }],
-                elements: elements,
-                bcs: bcs,
-                nodal_loads: nodalLoads,
-                element_loads: []
-            };
-        }
-
-        function showResults(results) {
-            document.getElementById('reactions-table').innerHTML = '';
-            document.getElementById('gpf-table').innerHTML = '';
-            document.getElementById('maxima-values').innerHTML = '';
-
-            const residuals = results.gpf_balance?.residuals || [];
-            let html = '<table class="data-table"><thead><tr><th>Node</th><th>DOF</th><th>Residual</th></tr></thead><tbody>';
-            for (let i = 0; i < residuals.length; i += 3) {
-                const node = i / 3;
-                html += `<tr><td>${node}</td><td>u</td><td>${residuals[i].toExponential(2)}</td></tr>`;
-                html += `<tr><td>${node}</td><td>v</td><td>${residuals[i+1].toExponential(2)}</td></tr>`;
-                html += `<tr><td>${node}</td><td>rz</td><td>${residuals[i+2].toExponential(2)}</td></tr>`;
-            }
-            html += '</tbody></table>';
-            document.getElementById('reactions-table').innerHTML = html;
-
-            const gpfDiv = document.getElementById('gpf-table');
-            if (results.gpf_balance) {
-                const maxResidual = Math.max(...results.gpf_balance.residuals.map(Math.abs));
-                const tolerance = results.gpf_balance.tolerance;
-                gpfDiv.innerHTML = `<p>Max residual: ${maxResidual.toExponential(4)}</p><p>Tolerance: ${tolerance.toExponential(4)}</p><p>Status: ${maxResidual <= tolerance ? 'PASS' : 'FAIL'}</p>`;
-            }
-
-            const maxima = results.maxima;
-            if (maxima) {
-                const m = maxima;
-                document.getElementById('maxima-values').innerHTML = `
-                    <table class="data-table">
-                        <tr><th>Quantity</th><th>Value</th><th>Location</th></tr>
-                        <tr><td>Deflection (max)</td><td>${m.deflection.value.toExponential(4)}</td><td>Node ${m.deflection.node_id}</td></tr>
-                        <tr><td>Moment (max)</td><td>${m.moment.value.toExponential(4)}</td><td>Element ${m.moment.element_id}</td></tr>
-                        <tr><td>Shear (max)</td><td>${m.shear.value.toExponential(4)}</td><td>Element ${m.shear.element_id}</td></tr>
-                        <tr><td>Axial (max)</td><td>${m.axial.value.toExponential(4)}</td><td>Element ${m.axial.element_id}</td></tr>
-                        <tr><td>Stress (max)</td><td>${m.stress.value.toExponential(4)}</td><td>Element ${m.stress.element_id}</td></tr>
-                    </table>
-                `;
-            }
-
-            renderDiagrams(results.diagrams);
-        }
-
-        async function renderDiagrams(diagrams) {
-            const types = ['axial', 'shear', 'moment'];
-            const containers = [document.getElementById('axial-diagrams'), document.getElementById('shear-diagrams'), document.getElementById('moment-diagrams')];
-            const typeNames = ['Axial Force', 'Shear Force', 'Bending Moment'];
-
-            for (let t = 0; t < types.length; t++) {
-                const type = types[t];
-                const container = containers[t];
-                container.innerHTML = '';
-                for (const diagram of diagrams) {
-                    const elementId = diagram.element_id;
-                    const resp = await fetch(`${API_BASE}/diagram/${currentModelId}/${elementId}/${type}`);
-                    if (resp.ok) {
-                        const blob = await resp.blob();
-                        const url = URL.createObjectURL(blob);
-                        const div = document.createElement('div');
-                        div.className = 'diagram';
-                        div.innerHTML = `<strong>Element ${elementId} - ${typeNames[t]}</strong><br><img src="${url}" style="max-width: 100%; border: 1px solid #ddd;">`;
-                        container.appendChild(div);
-                    }
-                }
-            }
-        }
-
-        function handleCanvasClick(e) {
-            const canvas = document.getElementById('canvas');
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            // Convert screen to world coordinates
-            const scaleX = CANVAS_MAX_X - CANVAS_MIN_X;
-            const scaleY = CANVAS_MAX_Y - CANVAS_MIN_Y;
-            const worldX = CANVAS_MIN_X + (x / canvas.width) * scaleX;
-            const worldY = CANVAS_MAX_Y - (y / canvas.height) * scaleY;
-
-            if (clickMode === 'add-node') {
-                // Snap to grid
-                const snappedX = Math.round(worldX);
-                const snappedY = Math.round(worldY);
-                document.getElementById('snap-coords').textContent = `Snap: (${snappedX}, ${snappedY})`;
-                setTimeout(() => document.getElementById('snap-coords').textContent = '', 1000);
-
-                const newNode = { id: nodes.length, x: snappedX, y: snappedY };
-                nodes.push(newNode);
-                updateModelTree();
-                drawCanvas();
-                saveBtnEnabled();
-                clickMode = 'select';
-                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                document.querySelector('[data-mode="select"]').classList.add('active');
-                updateModeLabel();
-            } else if (clickMode === 'add-element') {
-                // Find nearest node
-                const nearest = findNearestNode(worldX, worldY, 20 / SCALE);
-                if (nearest) {
-                    if (!addElementState) {
-                        addElementState = { nodeId: nearest.id, x: nearest.x, y: nearest.y, nodeIdStr: nearest.idStr };
-                        document.getElementById('help-text').textContent = `First node: ${nearest.id}. Click second node.`;
-                    } else {
-                        const elem = {
-                            id: elements.length,
-                            node_i: addElementState.nodeId,
-                            node_j: nearest.id,
-                            material_id: 0,
-                            A: 1.0,
-                            Iz: 1.0
-                        };
-                        elements.push(elem);
-                        addElementState = null;
-                        updateModelTree();
-                        drawCanvas();
-                        saveBtnEnabled();
-                        clickMode = 'select';
-                        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                        document.querySelector('[data-mode="select"]').classList.add('active');
-                        updateModeLabel();
-                        document.getElementById('help-text').textContent = clickMode === 'select' ? 'Click node to select' : '';
-                    }
-                }
-            } else if (clickMode === 'add-bc' || clickMode === 'add-load') {
-                const nearest = findNearestNode(worldX, worldY, 20 / SCALE);
-                if (nearest) {
-                    document.getElementById(clickMode === 'add-bc' ? 'bc-node-id' : 'load-node-id').value = nearest.id;
-                    toggleModal(clickMode === 'add-bc' ? 'bc-modal' : 'load-modal', true);
-                }
-            } else {
-                // Select mode
-                const nearest = findNearestNode(worldX, worldY, 20 / SCALE);
-                if (nearest) {
-                    selectNode(nearest.id);
-                }
-            }
-        }
-
-        function findNearestNode(worldX, worldY, maxDist) {
-            let nearest = null;
-            let minDist = maxDist;
-            for (const node of nodes) {
-                const dist = Math.sqrt((node.x - worldX) ** 2 + (node.y - worldY) ** 2);
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearest = node;
-                }
-            }
-            return nearest;
-        }
-
-        function selectNode(id) {
-            selectedNodeId = id;
-            document.getElementById('bc-node-id').value = id;
-            document.getElementById('load-node-id').value = id;
-            updateModelTree();
-        }
-
-        function toggleModal(id, show) {
-            const modal = document.getElementById(id);
-            if (show) {
-                modal.classList.add('active');
-            } else {
-                modal.classList.remove('active');
-            }
-            if (show && clickMode === 'add-bc') {
-                clickMode = 'select';
-                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                document.querySelector('[data-mode="select"]').classList.add('active');
-                updateModeLabel();
-            }
-        }
-
-        function saveBc() {
-            const nodeId = parseInt(document.getElementById('bc-node-id').value);
-            const dof = document.getElementById('bc-dof').value;
-            const value = parseFloat(document.getElementById('bc-value').value);
-
-            bcs.push({ node_id: nodeId, dof, value });
-            updateModelTree();
-            drawCanvas();
-            toggleModal('bc-modal', false);
-        }
-
-        function saveLoad() {
-            const nodeId = parseInt(document.getElementById('load-node-id').value);
-            const Fx = parseFloat(document.getElementById('load-fx').value) || 0;
-            const Fy = parseFloat(document.getElementById('load-fy').value) || 0;
-            const Mz = parseFloat(document.getElementById('load-mz').value) || 0;
-
-            nodalLoads.push({ node_id: nodeId, Fx, Fy, Mz });
-            updateModelTree();
-            drawCanvas();
-            toggleModal('load-modal', false);
-        }
-
-        function saveModel() {
-            const model = buildModel();
-            const jsonStr = JSON.stringify(model, null, 2);
-            const blob = new Blob([jsonStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'custom.beamfea.json';
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        async function loadModelFromFile(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            try {
-                const text = await file.text();
-                const model = JSON.parse(text);
-                nodes = model.nodes || [];
-                elements = model.elements || [];
-                bcs = model.bcs || [];
-                nodalLoads = model.nodal_loads || [];
-                addElementState = null;
-
-                const resp = await fetch(`${API_BASE}/model`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(model)
-                });
-
-                if (resp.ok) {
-                    currentModelId = (await resp.json()).model_id;
-                }
-                updateModelTree();
-                drawCanvas();
-                saveBtnEnabled();
-            } catch (err) {
-                alert(`Failed to load: ${err.message}`);
-            }
-        }
-
-        function saveBtnEnabled() {
-            document.getElementById('save-btn').disabled = nodes.length === 0;
-            document.getElementById('solve-btn').disabled = nodes.length === 0;
-        }
-
-        function updateModelTree() {
-            const tree = document.getElementById('model-tree');
-            let html = '<div class="tree-node expanded"><span class="toggle">▼</span>Nodes</div><div class="tree-content">';
-            for (const node of nodes) {
-                let prefix = '';
-                const nodeBCs = bcs.filter(b => b.node_id === node.id);
-                const nodeLoads = nodalLoads.filter(l => l.node_id === node.id);
-                if (nodeBCs.length > 0) prefix += '<span class="bc-icon" title="BCs"></span>';
-                if (nodeLoads.length > 0) prefix += '<span class="load-icon" title="Loads"></span>';
-                html += `<div class="tree-node" data-type="node" data-id="${node.id}">${prefix}Node ${node.id}: (${node.x}, ${node.y})</div>`;
-            }
-            html += '</div>';
-
-            html += '<div class="tree-node"><span class="toggle">▶</span>Elements</div><div class="tree-content">';
-            for (const elem of elements) {
-                html += `<div class="tree-node">Element ${elem.id}: Node ${elem.node_i} -> ${elem.node_j}</div>`;
-            }
-            html += '</div>';
-
-            html += '<div class="tree-node"><span class="toggle">▶</span>BCs</div><div class="tree-content">';
-            for (const bc of bcs) {
-                html += `<div class="tree-node">Node ${bc.node_id}, ${bc.dof} = ${bc.value}</div>`;
-            }
-            html += '</div>';
-
-            html += '<div class="tree-node"><span class="toggle">▶</span>Loads</div><div class="tree-content">';
-            for (const load of nodalLoads) {
-                html += `<div class="tree-node">Node ${load.node_id}: Fx=${load.Fx}, Fy=${load.Fy}, Mz=${load.Mz}</div>`;
-            }
-            html += '</div>';
-
-            tree.innerHTML = html;
-
-            tree.querySelectorAll('.tree-node > .toggle').forEach(toggle => {
-                toggle.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const parent = toggle.parentElement;
-                    parent.classList.toggle('expanded');
-                    parent.querySelector(':scope > .tree-content').style.display = parent.classList.contains('expanded') ? 'block' : 'none';
-                });
-            });
-
-            tree.querySelectorAll('.tree-node[data-type="node"]').forEach(nodeEl => {
-                nodeEl.addEventListener('click', (e) => {
-                    if (e.target !== e.currentTarget) return;
-                    selectNode(parseInt(nodeEl.dataset.id));
-                });
-            });
-        }
-
-        function drawCanvas() {
-            const canvas = document.getElementById('canvas');
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Calculate scale factors
-            const scaleX = (CANVAS_MAX_X - CANVAS_MIN_X) / canvas.width;
-            const scaleY = (CANVAS_MAX_Y - CANVAS_MIN_Y) / canvas.height;
-
-            function toScreen(x, y) {
-                return { x: (x - CANVAS_MIN_X) / scaleX, y: canvas.height - (y - CANVAS_MIN_Y) / scaleY };
-            }
-
-            // Draw grid
-            ctx.strokeStyle = '#e0e0e0';
-            ctx.lineWidth = 1;
-
-            // Major grid every 12 inches
-            for (let x = CANVAS_MIN_X; x <= CANVAS_MAX_X; x += GRID_MAJOR) {
-                const p1 = toScreen(x, CANVAS_MIN_Y);
-                const p2 = toScreen(x, CANVAS_MAX_Y);
-                ctx.beginPath();
-                ctx.moveTo(p1.x, p1.y);
-                ctx.lineTo(p2.x, p2.y);
-                ctx.stroke();
-                ctx.fillStyle = '#999';
-                ctx.font = '10px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(x, p1.x, p1.y + 15);
-            }
-
-            for (let y = CANVAS_MIN_Y; y <= CANVAS_MAX_Y; y += GRID_MAJOR) {
-                const p1 = toScreen(CANVAS_MIN_X, y);
-                const p2 = toScreen(CANVAS_MAX_X, y);
-                ctx.beginPath();
-                ctx.moveTo(p1.x, p1.y);
-                ctx.lineTo(p2.x, p2.y);
-                ctx.stroke();
-                ctx.fillStyle = '#999';
-                ctx.font = '10px sans-serif';
-                ctx.textAlign = 'right';
-                ctx.fillText(y, p1.x - 5, p1.y + 4);
-            }
-
-            // Minor grid every 1 inch
-            ctx.strokeStyle = '#f0f0f0';
-            for (let x = CANVAS_MIN_X; x <= CANVAS_MAX_X; x += GRID_MINOR) {
-                if (x % GRID_MAJOR === 0) continue;
-                const p1 = toScreen(x, CANVAS_MIN_Y);
-                const p2 = toScreen(x, CANVAS_MAX_Y);
-                ctx.beginPath();
-                ctx.moveTo(p1.x, p1.y);
-                ctx.lineTo(p2.x, p2.y);
-                ctx.stroke();
-            }
-            for (let y = CANVAS_MIN_Y; y <= CANVAS_MAX_Y; y += GRID_MINOR) {
-                if (y % GRID_MAJOR === 0) continue;
-                const p1 = toScreen(CANVAS_MIN_X, y);
-                const p2 = toScreen(CANVAS_MAX_X, y);
-                ctx.beginPath();
-                ctx.moveTo(p1.x, p1.y);
-                ctx.lineTo(p2.x, p2.y);
-                ctx.stroke();
-            }
-
-            if (nodes.length === 0) return;
-
-            // Draw elements
-            ctx.strokeStyle = '#3498db';
-            ctx.lineWidth = 3;
-            for (const elem of elements) {
-                const n1 = nodes[elem.node_i];
-                const n2 = nodes[elem.node_j];
-                const p1 = toScreen(n1.x, n1.y);
-                const p2 = toScreen(n2.x, n2.y);
-                ctx.beginPath();
-                ctx.moveTo(p1.x, p1.y);
-                ctx.lineTo(p2.x, p2.y);
-                ctx.stroke();
-
-                ctx.fillStyle = '#2980b9';
-                ctx.beginPath();
-                ctx.arc(p1.x, p1.y, 6, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(p2.x, p2.y, 6, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.fillStyle = '#000';
-                ctx.font = '12px sans-serif';
-                ctx.textAlign = 'right';
-                ctx.fillText(`N${n1.id}`, p1.x - 10, p1.y - 5);
-                ctx.textAlign = 'left';
-                ctx.fillText(`N${n2.id}`, p2.x + 10, p2.y - 5);
-            }
-
-            // Draw node IDs
-            for (const node of nodes) {
-                const p = toScreen(node.x, node.y);
-                ctx.fillStyle = '#000';
-                ctx.font = '11px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(node.id, p.x, p.y + 20);
-            }
-
-            // Draw BCs
-            for (const bc of bcs) {
-                const node = nodes[bc.node_id];
-                if (!node) continue;
-                const p = toScreen(node.x, node.y);
-
-                if (bc.dof === 'u' && bc.dof === 'v' && bc.dof === 'rz') {
-                    // Fixed support - triangle with hatching
-                    drawFixedSupport(ctx, p.x, p.y + 15);
-                } else if (bc.dof === 'u' && bc.dof === 'v') {
-                    // Pinned - solid triangle
-                    drawPinnedSupport(ctx, p.x, p.y + 15);
-                } else if (bc.dof === 'v') {
-                    // Roller - triangle with circles
-                    drawRollerSupport(ctx, p.x, p.y + 15);
-                }
-            }
-
-            // Draw loads
-            for (const load of nodalLoads) {
-                if ((load.Fx || 0) !== 0 || (load.Fy || 0) !== 0) {
-                    const node = nodes[load.node_id];
-                    if (!node) continue;
-                    const p = toScreen(node.x, node.y);
-                    drawLoadArrow(ctx, p.x, p.y, load.Fx || 0, load.Fy || 0);
-                }
-            }
-
-            // Highlight selected node
-            if (selectedNodeId !== null) {
-                const node = nodes.find(n => n.id === selectedNodeId);
-                if (node) {
-                    const p = toScreen(node.x, node.y);
-                    ctx.strokeStyle = '#e74c3c';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-            }
-
-            // Highlight first node for element creation
-            if (addElementState) {
-                const node = nodes.find(n => n.id === addElementState.nodeId);
-                if (node) {
-                    const p = toScreen(node.x, node.y);
-                    ctx.strokeStyle = '#f39c12';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, 12, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-            }
-        }
-
-        function drawFixedSupport(ctx, x, y) {
-            ctx.fillStyle = '#555';
-            ctx.beginPath();
-            ctx.moveTo(x - 15, y);
-            ctx.lineTo(x + 15, y);
-            ctx.lineTo(x, y - 10);
-            ctx.closePath();
-            ctx.fill();
-
-            // Hatching
-            ctx.strokeStyle = '#555';
-            ctx.lineWidth = 1;
-            for (let i = 0; i < 10; i++) {
-                ctx.beginPath();
-                ctx.moveTo(x - 15 + i * 3, y + 5);
-                ctx.lineTo(x - 15 + i * 3 + 10, y - 2);
-                ctx.stroke();
-            }
-        }
-
-        function drawPinnedSupport(ctx, x, y) {
-            ctx.fillStyle = '#555';
-            ctx.beginPath();
-            ctx.moveTo(x - 10, y);
-            ctx.lineTo(x + 10, y);
-            ctx.lineTo(x, y - 12);
-            ctx.closePath();
-            ctx.fill();
-        }
-
-        function drawRollerSupport(ctx, x, y) {
-            ctx.fillStyle = '#555';
-            ctx.beginPath();
-            ctx.moveTo(x - 12, y);
-            ctx.lineTo(x + 12, y);
-            ctx.lineTo(x, y - 10);
-            ctx.closePath();
-            ctx.fill();
-
-            ctx.fillStyle = '#777';
-            ctx.beginPath();
-            ctx.arc(x - 8, y + 3, 3, 0, Math.PI * 2);
-            ctx.arc(x + 8, y + 3, 3, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        function drawLoadArrow(ctx, x, y, fx, fy) {
-            const maxMag = Math.max(Math.abs(fx), Math.abs(fy));
-            if (maxMag === 0) return;
-            const scale = 0.1;
-            const dx = fx * scale;
-            const dy = fy * scale;
-            const mag = Math.sqrt(dx * dx + dy * dy);
-            if (mag < 5) return;
-
-            const fromX = x;
-            const fromY = y;
-            const toX = x + dx;
-            const toY = y + dy;
-
-            ctx.strokeStyle = '#e74c3c';
-            ctx.lineWidth = 2;
-            ctx.fillStyle = '#e74c3c';
-
-            // arrowhead
-            const angle = Math.atan2(toY - fromY, toX - fromX);
-            const headLen = 10;
-            const halfHead = 0.5;
-
-            ctx.beginPath();
-            ctx.moveTo(fromX, fromY);
-            ctx.lineTo(toX, toY);
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.moveTo(toX, toY);
-            ctx.lineTo(toX - headLen * Math.cos(angle - halfHead), toY - headLen * Math.sin(angle - halfHead));
-            ctx.lineTo(toX - headLen * Math.cos(angle + halfHead), toY - headLen * Math.sin(angle + halfHead));
-            ctx.lineTo(toX, toY);
-            ctx.fill();
-        }
-
-        // Initial draw
+        <div class="modal-footer"><button id="load-save">Save</button><button id="load-cancel" style="background:#6c757d">Cancel</button></div>
+    </div></div>
+
+    <!-- Node Modal -->
+    <div id="node-modal" class="modal"><div class="modal-content">
+        <div class="modal-header" id="node-modal-title">Add Node</div>
+        <div class="modal-body">
+            <div class="field-group">
+                <div class="field"><label>X (in)</label><input type="number" id="node-x" value="0" step="any"></div>
+                <div class="field"><label>Y (in)</label><input type="number" id="node-y" value="0" step="any"></div>
+            </div>
+        </div>
+        <div class="modal-footer"><button id="node-save">Save</button><button id="node-delete" style="background:#e74c3c;display:none">Delete</button><button id="node-cancel" style="background:#6c757d">Cancel</button></div>
+    </div></div>
+
+    <!-- Element Modal -->
+    <div id="element-modal" class="modal"><div class="modal-content">
+        <div class="modal-header">Element Properties</div>
+        <div class="modal-body">
+            <div class="field"><label>Element</label><input type="text" id="elem-label" readonly></div>
+            <div class="field-group">
+                <div class="field"><label>A (in^2)</label><input type="number" id="elem-a" value="1.0" step="any" min="0.0001"></div>
+                <div class="field"><label>Iz (in^4)</label><input type="number" id="elem-iz" value="1.0" step="any" min="0.0001"></div>
+            </div>
+            <div class="field-group" style="margin-top:8px">
+                <div class="field"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="elem-pin-i" style="width:auto"> Pin i-end (release Mz)</label></div>
+                <div class="field"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="elem-pin-j" style="width:auto"> Pin j-end (release Mz)</label></div>
+            </div>
+        </div>
+        <div class="modal-footer"><button id="elem-save">Save</button><button id="elem-delete" style="background:#e74c3c">Delete</button><button id="elem-cancel" style="background:#6c757d">Cancel</button></div>
+    </div></div>
+
+    <input type="file" id="file-input" accept=".json,.beamfea.json" style="display:none">
+
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════════════════════
+   STATE
+   ══════════════════════════════════════════════════════════════ */
+const API = '';
+let modelId = null;
+let nodes = [], elements = [], bcs = [], loads = [];
+let mode = 'select';
+let selNodeId = null, elemFirst = null;
+let editBcIdx = null, editLoadIdx = null, editElemIdx = null, editNodeIdx = null;
+let pendingElement = null;
+
+/* zoom/pan state */
+let zoomDrag = null;   // {sx, sy} screen coords of drag start for zoom-box
+let panDrag = null;    // {sx, sy, vx0, vy0, vx1, vy1} for right-click pan
+let manualViewport = false; // true when user has zoomed/panned manually
+
+/* solved results (null until solve) */
+let R = null;   // full results object from API
+
+/* viewport */
+let vMinX = 0, vMaxX = 240, vMinY = -60, vMaxY = 60, gridStep = 24;
+
+/* DOM refs */
+let $c, $x, $sb, $ml, $ht, $sc;
+
+document.addEventListener('DOMContentLoaded', () => {
+    $c  = document.getElementById('canvas');
+    $x  = $c.getContext('2d');
+    $sb = document.getElementById('status-bar');
+    $ml = document.getElementById('mode-label');
+    $ht = document.getElementById('help-text');
+    $sc = document.getElementById('snap-coords');
+    wire();
+    sizeCanvas();
+    recomputeViewport();
+    drawCanvas();
+    refreshTree();
+});
+
+/* ══════════════════════════════════════════════════════════════
+   EVENTS
+   ══════════════════════════════════════════════════════════════ */
+function wire() {
+    document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        b.classList.add('active');
+        document.getElementById('tab-' + b.dataset.tab).classList.add('active');
+    }));
+    document.querySelectorAll('.mode-btn').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+    $c.addEventListener('click', onCanvasClick);
+    $c.addEventListener('mousemove', onCanvasMove);
+    $c.addEventListener('wheel', onWheel, { passive: false });
+    $c.addEventListener('mousedown', onMouseDown);
+    $c.addEventListener('mouseup', onMouseUp);
+    $c.addEventListener('contextmenu', e => e.preventDefault());
+    window.addEventListener('resize', () => { sizeCanvas(); if (!manualViewport) recomputeViewport(); drawCanvas(); });
+    document.getElementById('fit-btn').addEventListener('click', () => { manualViewport = false; recomputeViewport(); drawCanvas(); });
+    window.addEventListener('keydown', e => { if (e.key === 'Escape') { setMode('select'); elemFirst = null; drawCanvas(); } });
+    document.getElementById('solve-btn').addEventListener('click', doSolve);
+    document.getElementById('save-btn').addEventListener('click', doSaveFile);
+    document.getElementById('load-btn').addEventListener('click', () => document.getElementById('file-input').click());
+    document.getElementById('file-input').addEventListener('change', doLoadFile);
+    document.getElementById('bc-save').addEventListener('click', commitBc);
+    document.getElementById('bc-cancel').addEventListener('click', () => closeModal('bc-modal'));
+    document.getElementById('load-save').addEventListener('click', commitLoad);
+    document.getElementById('load-cancel').addEventListener('click', () => closeModal('load-modal'));
+    document.getElementById('elem-save').addEventListener('click', commitElement);
+    document.getElementById('elem-delete').addEventListener('click', removeElement);
+    document.getElementById('elem-cancel').addEventListener('click', () => closeModal('element-modal'));
+    document.getElementById('node-save').addEventListener('click', commitNode);
+    document.getElementById('node-delete').addEventListener('click', removeNode);
+    document.getElementById('node-cancel').addEventListener('click', () => closeModal('node-modal'));
+    /* overlay toggles redraw */
+    for (const id of ['chk-defl','chk-react','chk-smd','chk-maxima']) {
+        document.getElementById(id).addEventListener('change', () => drawCanvas());
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MODE
+   ══════════════════════════════════════════════════════════════ */
+function setMode(m) {
+    mode = m; elemFirst = null;
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+    const hints = { select:'Click a node to select. Right-drag to pan. Scroll to zoom.', 'add-node':'Click canvas (opens coord dialog)',
+        'add-element':'Click first node, then second', 'add-bc':'Click a node', 'add-load':'Click a node',
+        'zoom-box':'Drag a rectangle to zoom in. Scroll wheel also zooms. Right-drag to pan.' };
+    $ml.textContent = 'Mode: ' + m; $ht.textContent = hints[m] || '';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   VIEWPORT + COORDINATE MAPPING
+   ══════════════════════════════════════════════════════════════ */
+function sizeCanvas() { const w = $c.parentElement; $c.width = w.clientWidth; $c.height = w.clientHeight; }
+
+function recomputeViewport() {
+    if (nodes.length === 0) { vMinX=0; vMaxX=240; vMinY=-60; vMaxY=60; }
+    else {
+        let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+        for (const n of nodes) { if(n.x<x0)x0=n.x; if(n.x>x1)x1=n.x; if(n.y<y0)y0=n.y; if(n.y>y1)y1=n.y; }
+        let dx=x1-x0, dy=y1-y0;
+        if(dx<1) dx=Math.max(Math.abs(x1),10);
+        if(dy<1) dy=dx*0.4;
+        const pad=0.20, cx=(x0+x1)/2, cy=(y0+y1)/2;
+        let hx=dx*(1+pad)/2, hy=dy*(1+pad)/2;
+        const ar=$c.width/($c.height||1);
+        if(hx/hy>ar) hy=hx/ar; else hx=hy*ar;
+        vMinX=cx-hx; vMaxX=cx+hx; vMinY=cy-hy; vMaxY=cy+hy;
+    }
+    gridStep = niceStep((vMaxX-vMinX)/8);
+}
+
+function niceStep(r) {
+    if(r<=0) return 1;
+    const m=Math.pow(10,Math.floor(Math.log10(r))), f=r/m;
+    return (f<=1.5?1:f<=3?2:f<=7?5:10)*m;
+}
+
+function toWorld(px,py) { return { x: vMinX+(px/$c.width)*(vMaxX-vMinX), y: vMaxY-(py/$c.height)*(vMaxY-vMinY) }; }
+function toScreen(wx,wy) { return { x: ((wx-vMinX)/(vMaxX-vMinX))*$c.width, y: ((vMaxY-wy)/(vMaxY-vMinY))*$c.height }; }
+function pxToWorld(px) { return px*(vMaxX-vMinX)/$c.width; }
+
+/* ══════════════════════════════════════════════════════════════
+   CANVAS CLICK / MOVE
+   ══════════════════════════════════════════════════════════════ */
+function onCanvasMove(e) {
+    const rect=$c.getBoundingClientRect();
+    const px=e.clientX-rect.left, py=e.clientY-rect.top;
+    const w=toWorld(px,py);
+    $sc.textContent = mode==='add-node' ? `(${Math.round(w.x)}, ${Math.round(w.y)})` : `(${w.x.toFixed(1)}, ${w.y.toFixed(1)})`;
+
+    // Pan drag (right-click)
+    if (panDrag) {
+        const dxPx = px - panDrag.sx, dyPx = py - panDrag.sy;
+        const dxW = dxPx * (panDrag.vx1 - panDrag.vx0) / $c.width;
+        const dyW = dyPx * (panDrag.vy1 - panDrag.vy0) / $c.height;
+        vMinX = panDrag.vx0 - dxW;
+        vMaxX = panDrag.vx1 - dxW;
+        vMinY = panDrag.vy0 + dyW;  // screen-y is inverted
+        vMaxY = panDrag.vy1 + dyW;
+        manualViewport = true;
         drawCanvas();
-    </script>
+        return;
+    }
+
+    // Zoom-box drag
+    if (zoomDrag && mode === 'zoom-box') {
+        const box = document.getElementById('zoom-rect');
+        if (box) {
+            const x = Math.min(px, zoomDrag.sx), y = Math.min(py, zoomDrag.sy);
+            box.style.left = x + 'px';
+            box.style.top = y + 'px';
+            box.style.width = Math.abs(px - zoomDrag.sx) + 'px';
+            box.style.height = Math.abs(py - zoomDrag.sy) + 'px';
+        }
+    }
+}
+
+function onCanvasClick(e) {
+    const r=$c.getBoundingClientRect(), w=toWorld(e.clientX-r.left,e.clientY-r.top);
+    if (mode==='add-node') {
+        editNodeIdx=null;
+        document.getElementById('node-modal-title').textContent='Add Node';
+        document.getElementById('node-x').value=Math.round(w.x);
+        document.getElementById('node-y').value=Math.round(w.y);
+        document.getElementById('node-delete').style.display='none';
+        openModal('node-modal'); return;
+    }
+    if (mode==='add-element') {
+        const hit=nearest(w.x,w.y);
+        if(!hit) return;
+        if(!elemFirst) { elemFirst=hit; $ht.textContent=`First: N${hit.id} -- click second`; drawCanvas(); return; }
+        if(hit.id===elemFirst.id) return;
+        pendingElement={node_i:elemFirst.id,node_j:hit.id};
+        document.getElementById('elem-label').value=`N${elemFirst.id} -> N${hit.id}`;
+        document.getElementById('elem-a').value=1.0; document.getElementById('elem-iz').value=1.0;
+        document.getElementById('elem-pin-i').checked=false; document.getElementById('elem-pin-j').checked=false;
+        editElemIdx=null; openModal('element-modal'); elemFirst=null; return;
+    }
+    if (mode==='add-bc') {
+        const hit=nearest(w.x,w.y); if(!hit) return;
+        editBcIdx=null; document.getElementById('bc-modal-title').textContent='Add BC';
+        document.getElementById('bc-node-id').value=hit.id; document.getElementById('bc-dof').value='u'; document.getElementById('bc-value').value=0;
+        openModal('bc-modal'); return;
+    }
+    if (mode==='add-load') {
+        const hit=nearest(w.x,w.y); if(!hit) return;
+        editLoadIdx=null; document.getElementById('load-modal-title').textContent='Add Nodal Load';
+        document.getElementById('load-node-id').value=hit.id;
+        document.getElementById('load-fx').value=0; document.getElementById('load-fy').value=0; document.getElementById('load-mz').value=0;
+        openModal('load-modal'); return;
+    }
+    /* select */
+    const hit=nearest(w.x,w.y);
+    selNodeId = hit ? hit.id : null;
+    refreshTree(); refreshNodeForces(); drawCanvas();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ZOOM & PAN
+   ══════════════════════════════════════════════════════════════ */
+function onWheel(e) {
+    e.preventDefault();
+    const rect = $c.getBoundingClientRect();
+    const px = e.clientX - rect.left, py = e.clientY - rect.top;
+    const wPt = toWorld(px, py);
+    const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15; // zoom out / in
+    // Scale viewport around cursor world point
+    vMinX = wPt.x + (vMinX - wPt.x) * factor;
+    vMaxX = wPt.x + (vMaxX - wPt.x) * factor;
+    vMinY = wPt.y + (vMinY - wPt.y) * factor;
+    vMaxY = wPt.y + (vMaxY - wPt.y) * factor;
+    gridStep = niceStep((vMaxX - vMinX) / 8);
+    manualViewport = true;
+    drawCanvas();
+}
+
+function onMouseDown(e) {
+    const rect = $c.getBoundingClientRect();
+    const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+
+    // Right-click: start pan
+    if (e.button === 2) {
+        e.preventDefault();
+        panDrag = { sx, sy, vx0: vMinX, vy0: vMinY, vx1: vMaxX, vy1: vMaxY };
+        $c.style.cursor = 'grabbing';
+        return;
+    }
+
+    // Zoom-box mode: left-click starts drag
+    if (mode === 'zoom-box' && e.button === 0) {
+        zoomDrag = { sx, sy };
+        const box = document.getElementById('zoom-rect');
+        box.style.left = sx + 'px';
+        box.style.top = sy + 'px';
+        box.style.width = '0px';
+        box.style.height = '0px';
+        box.style.display = 'block';
+    }
+}
+
+function onMouseUp(e) {
+    // End pan
+    if (panDrag && e.button === 2) {
+        panDrag = null;
+        $c.style.cursor = '';
+        return;
+    }
+
+    // End zoom-box
+    if (zoomDrag && mode === 'zoom-box' && e.button === 0) {
+        const rect = $c.getBoundingClientRect();
+        const ex = e.clientX - rect.left, ey = e.clientY - rect.top;
+        const dx = Math.abs(ex - zoomDrag.sx), dy = Math.abs(ey - zoomDrag.sy);
+
+        // Hide rectangle
+        const box = document.getElementById('zoom-rect');
+        if (box) box.style.display = 'none';
+
+        // Only zoom if drag was substantial (>10px)
+        if (dx > 10 && dy > 10) {
+            const w1 = toWorld(Math.min(zoomDrag.sx, ex), Math.min(zoomDrag.sy, ey));
+            const w2 = toWorld(Math.max(zoomDrag.sx, ex), Math.max(zoomDrag.sy, ey));
+            // w1 is top-left in screen = (minX, maxY), w2 is bottom-right = (maxX, minY)
+            vMinX = w1.x; vMaxX = w2.x;
+            vMinY = w2.y; vMaxY = w1.y;
+            gridStep = niceStep((vMaxX - vMinX) / 8);
+            manualViewport = true;
+            drawCanvas();
+        }
+        zoomDrag = null;
+    }
+}
+
+function nearest(wx,wy) {
+    let best=null, bd=pxToWorld(20);
+    for(const n of nodes){ const d=Math.hypot(n.x-wx,n.y-wy); if(d<bd){bd=d;best=n;} }
+    return best;
+}
+
+/** Post-mutation refresh. keepMode=true preserves current mode (sticky creation). */
+function after(keepMode) {
+    if (!keepMode) setMode('select');
+    if (!manualViewport) recomputeViewport();
+    refreshTree(); drawCanvas(); updateButtons();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MODALS
+   ══════════════════════════════════════════════════════════════ */
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id){ document.getElementById(id).classList.remove('active'); }
+
+function commitBc() {
+    const o={node_id:parseInt(document.getElementById('bc-node-id').value),dof:document.getElementById('bc-dof').value,value:parseFloat(document.getElementById('bc-value').value)||0};
+    if(editBcIdx!==null) bcs[editBcIdx]=o; else bcs.push(o);
+    editBcIdx=null; closeModal('bc-modal'); after(mode==='add-bc');
+}
+function commitLoad() {
+    const o={node_id:parseInt(document.getElementById('load-node-id').value),Fx:parseFloat(document.getElementById('load-fx').value)||0,Fy:parseFloat(document.getElementById('load-fy').value)||0,Mz:parseFloat(document.getElementById('load-mz').value)||0};
+    if(editLoadIdx!==null) loads[editLoadIdx]=o; else loads.push(o);
+    editLoadIdx=null; closeModal('load-modal'); after(mode==='add-load');
+}
+function commitElement() {
+    const A=parseFloat(document.getElementById('elem-a').value)||1,Iz=parseFloat(document.getElementById('elem-iz').value)||1;
+    const pinI=document.getElementById('elem-pin-i').checked, pinJ=document.getElementById('elem-pin-j').checked;
+    if(editElemIdx!==null){elements[editElemIdx].A=A;elements[editElemIdx].Iz=Iz;elements[editElemIdx].release_i_Mz=pinI;elements[editElemIdx].release_j_Mz=pinJ;}
+    else if(pendingElement){const eid=elements.length>0?Math.max(...elements.map(e=>e.id))+1:0;elements.push({id:eid,node_i:pendingElement.node_i,node_j:pendingElement.node_j,material_id:0,A,Iz,release_i_Mz:pinI,release_j_Mz:pinJ});pendingElement=null;}
+    editElemIdx=null; closeModal('element-modal'); after(mode==='add-element');
+}
+function removeElement(){ if(editElemIdx!==null){elements.splice(editElemIdx,1);editElemIdx=null;} closeModal('element-modal'); after(); }
+function commitNode() {
+    const x=parseFloat(document.getElementById('node-x').value),y=parseFloat(document.getElementById('node-y').value);
+    if(isNaN(x)||isNaN(y)){alert('Enter valid coordinates');return;}
+    if(editNodeIdx!==null){nodes[editNodeIdx].x=x;nodes[editNodeIdx].y=y;}
+    else { const nid = nodes.length > 0 ? Math.max(...nodes.map(n=>n.id))+1 : 0; nodes.push({id:nid,x,y}); }
+    editNodeIdx=null; closeModal('node-modal'); after(mode==='add-node');
+}
+function removeNode(){
+    if(editNodeIdx!==null){const nid=nodes[editNodeIdx].id;elements=elements.filter(e=>e.node_i!==nid&&e.node_j!==nid);bcs=bcs.filter(b=>b.node_id!==nid);loads=loads.filter(l=>l.node_id!==nid);nodes.splice(editNodeIdx,1);editNodeIdx=null;selNodeId=null;}
+    closeModal('node-modal');after();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TREE (edit/delete helpers called from onclick in innerHTML)
+   ══════════════════════════════════════════════════════════════ */
+function treeEditBc(i){const b=bcs[i];if(!b)return;editBcIdx=i;document.getElementById('bc-modal-title').textContent='Edit BC';document.getElementById('bc-node-id').value=b.node_id;document.getElementById('bc-dof').value=b.dof;document.getElementById('bc-value').value=b.value;openModal('bc-modal');}
+function treeDeleteBc(i){bcs.splice(i,1);after();}
+function treeEditLoad(i){const l=loads[i];if(!l)return;editLoadIdx=i;document.getElementById('load-modal-title').textContent='Edit Load';document.getElementById('load-node-id').value=l.node_id;document.getElementById('load-fx').value=l.Fx;document.getElementById('load-fy').value=l.Fy;document.getElementById('load-mz').value=l.Mz;openModal('load-modal');}
+function treeDeleteLoad(i){loads.splice(i,1);after();}
+function treeEditElem(i){const e=elements[i];if(!e)return;editElemIdx=i;pendingElement=null;document.getElementById('elem-label').value=`E${e.id}: N${e.node_i}->N${e.node_j}`;document.getElementById('elem-a').value=e.A;document.getElementById('elem-iz').value=e.Iz;document.getElementById('elem-pin-i').checked=!!e.release_i_Mz;document.getElementById('elem-pin-j').checked=!!e.release_j_Mz;openModal('element-modal');}
+function treeEditNode(i){const n=nodes[i];if(!n)return;editNodeIdx=i;document.getElementById('node-modal-title').textContent='Edit N'+n.id;document.getElementById('node-x').value=n.x;document.getElementById('node-y').value=n.y;document.getElementById('node-delete').style.display='';openModal('node-modal');}
+
+function toggleSection(h){const b=h.nextElementSibling,a=h.querySelector('.toggle');b.classList.toggle('collapsed');a.innerHTML=b.classList.contains('collapsed')?'&#9654;':'&#9660;';}
+
+function refreshTree() {
+    const t=document.getElementById('model-tree'); let h='';
+    h+='<div class="tree-section"><div class="tree-header" onclick="toggleSection(this)"><span class="toggle">&#9660;</span> Nodes ('+nodes.length+')</div><div class="tree-body">';
+    for(let i=0;i<nodes.length;i++){const n=nodes[i],sel=n.id===selNodeId?' selected':'',bc=bcs.some(b=>b.node_id===n.id)?' [BC]':'',ld=loads.some(l=>l.node_id===n.id)?' [F]':'';
+    h+=`<div class="tree-item${sel}"><span class="tree-item-label" onclick="selNodeId=${n.id};refreshTree();refreshNodeForces();drawCanvas()">N${n.id}: (${n.x}, ${n.y})${bc}${ld}</span><span class="tree-item-actions"><button class="btn-xs btn-edit" onclick="treeEditNode(${i})">&#9998;</button></span></div>`;}
+    h+='</div></div>';
+    h+='<div class="tree-section"><div class="tree-header" onclick="toggleSection(this)"><span class="toggle">&#9660;</span> Elements ('+elements.length+')</div><div class="tree-body">';
+    for(let i=0;i<elements.length;i++){const e=elements[i];const pins=(e.release_i_Mz?'o':'')+(e.release_j_Mz?'o':'');const pinLabel=pins?' ['+pins+']':'';h+=`<div class="tree-item"><span class="tree-item-label">E${e.id}: N${e.node_i}-N${e.node_j} A=${e.A} Iz=${e.Iz}${pinLabel}</span><span class="tree-item-actions"><button class="btn-xs btn-edit" onclick="treeEditElem(${i})">&#9998;</button></span></div>`;}
+    h+='</div></div>';
+    h+='<div class="tree-section"><div class="tree-header" onclick="toggleSection(this)"><span class="toggle">&#9660;</span> BCs ('+bcs.length+')</div><div class="tree-body">';
+    for(let i=0;i<bcs.length;i++){const b=bcs[i];h+=`<div class="tree-item"><span class="tree-item-label">N${b.node_id} ${b.dof}=${b.value}</span><span class="tree-item-actions"><button class="btn-xs btn-edit" onclick="treeEditBc(${i})">&#9998;</button><button class="btn-xs btn-del" onclick="treeDeleteBc(${i})">&#215;</button></span></div>`;}
+    h+='</div></div>';
+    h+='<div class="tree-section"><div class="tree-header" onclick="toggleSection(this)"><span class="toggle">&#9660;</span> Loads ('+loads.length+')</div><div class="tree-body">';
+    for(let i=0;i<loads.length;i++){const l=loads[i];h+=`<div class="tree-item"><span class="tree-item-label">N${l.node_id}: Fx=${l.Fx} Fy=${l.Fy} Mz=${l.Mz}</span><span class="tree-item-actions"><button class="btn-xs btn-edit" onclick="treeEditLoad(${i})">&#9998;</button><button class="btn-xs btn-del" onclick="treeDeleteLoad(${i})">&#215;</button></span></div>`;}
+    h+='</div></div>';
+    t.innerHTML=h;
+}
+
+function updateButtons(){
+    document.getElementById('solve-btn').disabled=!(nodes.length>0&&elements.length>0);
+    document.getElementById('save-btn').disabled=nodes.length===0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SOLVE
+   ══════════════════════════════════════════════════════════════ */
+async function doSolve(){
+    $ml.textContent='Solving...'; document.getElementById('solve-btn').disabled=true;
+    try{
+        const body=buildModel();
+        const r1=await fetch(API+'/model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        if(!r1.ok) throw new Error('POST /model '+r1.status);
+        modelId=(await r1.json()).model_id;
+        const r2=await fetch(API+'/solve/'+modelId,{method:'POST'});
+        if(!r2.ok) throw new Error('POST /solve '+r2.status+': '+await r2.text());
+        const r3=await fetch(API+'/results/'+modelId);
+        if(!r3.ok) throw new Error('GET /results '+r3.status);
+        R=await r3.json();
+        await showResults();
+        document.getElementById('overlay-bar').style.display='flex';
+        $ml.textContent='Solved'; $ht.textContent='';
+        drawCanvas();
+    } catch(err){ $ml.textContent='Error'; $ht.textContent=err.message; alert('Solve error: '+err.message); }
+    finally{ document.getElementById('solve-btn').disabled=false; }
+}
+
+function buildModel(){
+    return {schema_version:'1.0',name:'GUI Model',nodes,materials:[{id:0,E:10300000.0,nu:0.33}],elements,bcs,nodal_loads:loads,element_loads:[]};
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SHOW RESULTS (right pane tables)
+   ══════════════════════════════════════════════════════════════ */
+async function showResults(){
+    /* Deflection table */
+    {const d=R.displacements;let h='<table class="data-table"><tr><th>Node</th><th>u (in)</th><th>v (in)</th><th>rz (rad)</th></tr>';
+    for(const n of nodes){const b=n.id*3;h+=`<tr><td>N${n.id}</td><td>${fmt(d[b])}</td><td>${fmt(d[b+1])}</td><td>${fmt(d[b+2])}</td></tr>`;}
+    h+='</table>';document.getElementById('deflection-table').innerHTML=h;}
+
+    /* Reactions table */
+    if(R.reactions){let h='<table class="data-table"><tr><th>Node</th><th>DOF</th><th>Reaction</th></tr>';
+    for(const rc of R.reactions) h+=`<tr><td>N${rc.node_id}</td><td>${rc.dof}</td><td>${fmt(rc.value)}</td></tr>`;
+    h+='</table>';document.getElementById('reactions-table').innerHTML=h;}
+
+    /* Maxima */
+    if(R.maxima){const m=R.maxima;let h='<table class="data-table"><tr><th>Quantity</th><th>Value</th><th>Location</th></tr>';
+    h+=`<tr><td>Deflection</td><td>${fmt(m.deflection.value)}</td><td>N${m.deflection.node_id}</td></tr>`;
+    h+=`<tr><td>Moment</td><td>${fmt(m.moment.value)}</td><td>E${m.moment.element_id} @${fmt(m.moment.station)} in</td></tr>`;
+    h+=`<tr><td>Shear</td><td>${fmt(m.shear.value)}</td><td>E${m.shear.element_id} @${fmt(m.shear.station)} in</td></tr>`;
+    h+=`<tr><td>Axial</td><td>${fmt(m.axial.value)}</td><td>E${m.axial.element_id} @${fmt(m.axial.station)} in</td></tr>`;
+    h+=`<tr><td>Stress</td><td>${fmt(m.stress.value)}</td><td>E${m.stress.element_id} @${fmt(m.stress.station)} in</td></tr>`;
+    h+='</table>';document.getElementById('maxima-values').innerHTML=h;}
+
+    /* Node forces */
+    refreshNodeForces();
+
+    /* Diagram PNGs */
+    if(R.diagrams&&modelId){
+        for(const kind of ['shear','moment','axial']){
+            const ct=document.getElementById(kind+'-diagrams'); ct.innerHTML='';
+            for(const diag of R.diagrams){try{
+                const resp=await fetch(API+'/diagram/'+modelId+'/'+diag.element_id+'/'+kind);
+                if(!resp.ok)continue; const blob=await resp.blob();
+                ct.innerHTML+=`<div class="diagram"><strong>E${diag.element_id}</strong><br><img src="${URL.createObjectURL(blob)}"></div>`;
+            }catch(_){}}
+            if(!ct.innerHTML) ct.innerHTML='<em>No data</em>';
+        }
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   NODE FORCES TAB (freebody breakdown)
+   ══════════════════════════════════════════════════════════════ */
+function refreshNodeForces(){
+    const ct=document.getElementById('nodeforces-content');
+    if(!R||!R.element_contributions||selNodeId===null){ct.innerHTML='<em>Select a node on the canvas after solving</em>';return;}
+    const nid=selNodeId;
+    /* Find all element contributions touching this node */
+    const contribs=[];
+    for(const ec of R.element_contributions){
+        if(ec.node_i===nid) contribs.push({eid:ec.element_id,side:'i',Fx:ec.contrib_i.Fx,Fy:ec.contrib_i.Fy,Mz:ec.contrib_i.Mz});
+        if(ec.node_j===nid) contribs.push({eid:ec.element_id,side:'j',Fx:ec.contrib_j.Fx,Fy:ec.contrib_j.Fy,Mz:ec.contrib_j.Mz});
+    }
+    /* Applied load at this node */
+    let appFx=0,appFy=0,appMz=0;
+    for(const l of loads){if(l.node_id===nid){appFx+=l.Fx;appFy+=l.Fy;appMz+=l.Mz;}}
+    /* Reaction at this node */
+    let rxFx=0,rxFy=0,rxMz=0,hasRx=false;
+    if(R.reactions){for(const rc of R.reactions){if(rc.node_id===nid){hasRx=true;if(rc.dof==='u')rxFx=rc.value;if(rc.dof==='v')rxFy=rc.value;if(rc.dof==='rz')rxMz=rc.value;}}}
+
+    let h=`<h4 style="margin:0 0 6px">Node N${nid} Force Breakdown</h4>`;
+    h+='<div id="nf-rows">';
+    for(let i=0;i<contribs.length;i++){const c=contribs[i];
+    h+=`<div class="nf-row"><input type="checkbox" checked data-nf="${i}"><span class="nf-label">E${c.eid} (${c.side})</span><span class="nf-vals"><span>${fmt(c.Fx)}</span><span>${fmt(c.Fy)}</span><span>${fmt(c.Mz)}</span></span></div>`;}
+    if(appFx||appFy||appMz) h+=`<div class="nf-row"><input type="checkbox" checked data-nf="app"><span class="nf-label">Applied</span><span class="nf-vals"><span>${fmt(appFx)}</span><span>${fmt(appFy)}</span><span>${fmt(appMz)}</span></span></div>`;
+    if(hasRx) h+=`<div class="nf-row"><input type="checkbox" checked data-nf="rx"><span class="nf-label">Reaction</span><span class="nf-vals"><span>${fmt(rxFx)}</span><span>${fmt(rxFy)}</span><span>${fmt(rxMz)}</span></span></div>`;
+    h+='</div>';
+    h+=`<div class="nf-row nf-sum"><span class="nf-label">Sum (checked)</span><span class="nf-vals"><span id="nf-sx">-</span><span id="nf-sy">-</span><span id="nf-sm">-</span></span></div>`;
+    h+='<p style="font-size:0.75rem;color:#888;margin-top:6px">Uncheck items to isolate freebody contributions. Fx | Fy | Mz in global coords.</p>';
+    ct.innerHTML=h;
+
+    /* store data for checkbox recalc */
+    ct._nfData = {contribs,appFx,appFy,appMz,rxFx,rxFy,rxMz,hasRx,hasApp:!!(appFx||appFy||appMz)};
+    recalcNfSum();
+    ct.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.addEventListener('change',recalcNfSum));
+}
+
+function recalcNfSum(){
+    const ct=document.getElementById('nodeforces-content');
+    const d=ct._nfData; if(!d) return;
+    let sx=0,sy=0,sm=0;
+    ct.querySelectorAll('input[data-nf]').forEach(cb=>{
+        if(!cb.checked) return;
+        const k=cb.dataset.nf;
+        if(k==='app'){sx+=d.appFx;sy+=d.appFy;sm+=d.appMz;}
+        else if(k==='rx'){sx+=d.rxFx;sy+=d.rxFy;sm+=d.rxMz;}
+        else{const c=d.contribs[parseInt(k)];sx+=c.Fx;sy+=c.Fy;sm+=c.Mz;}
+    });
+    document.getElementById('nf-sx').textContent=fmt(sx);
+    document.getElementById('nf-sy').textContent=fmt(sy);
+    document.getElementById('nf-sm').textContent=fmt(sm);
+}
+
+function fmt(v){if(v==null)return'-';const a=Math.abs(v);if(a===0)return'0';if(a<0.001||a>=1e7)return v.toExponential(4);return v.toPrecision(6);}
+function fmtGrid(v){if(v===0)return'0';if(Number.isInteger(v))return v.toString();return v.toPrecision(4).replace(/\.?0+$/,'');}
+
+/* ══════════════════════════════════════════════════════════════
+   FILE I/O
+   ══════════════════════════════════════════════════════════════ */
+function doSaveFile(){const b=new Blob([JSON.stringify(buildModel(),null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='model.beamfea.json';a.click();}
+async function doLoadFile(e){const f=e.target.files[0];if(!f)return;try{const m=JSON.parse(await f.text());nodes=m.nodes||[];elements=m.elements||[];bcs=m.bcs||[];loads=m.nodal_loads||[];R=null;after();}catch(err){alert('Load failed: '+err.message);}e.target.value='';}
+
+/* ══════════════════════════════════════════════════════════════
+   CANVAS DRAWING
+   ══════════════════════════════════════════════════════════════ */
+function drawCanvas(){
+    if(!$c) return;
+    const ctx=$x, W=$c.width, H=$c.height;
+    if(W===0||H===0) return;
+    ctx.clearRect(0,0,W,H);
+
+    /* grid */
+    ctx.save();
+    const gs=gridStep, gx0=Math.floor(vMinX/gs)*gs, gy0=Math.floor(vMinY/gs)*gs;
+    ctx.strokeStyle='#e8e8e8'; ctx.lineWidth=1;
+    for(let gx=gx0;gx<=vMaxX;gx+=gs){const p=toScreen(gx,0);ctx.beginPath();ctx.moveTo(p.x,0);ctx.lineTo(p.x,H);ctx.stroke();}
+    for(let gy=gy0;gy<=vMaxY;gy+=gs){const p=toScreen(0,gy);ctx.beginPath();ctx.moveTo(0,p.y);ctx.lineTo(W,p.y);ctx.stroke();}
+    ctx.strokeStyle='#bbb';ctx.lineWidth=1.5;
+    if(vMinX<=0&&vMaxX>=0){const p=toScreen(0,0);ctx.beginPath();ctx.moveTo(p.x,0);ctx.lineTo(p.x,H);ctx.stroke();}
+    if(vMinY<=0&&vMaxY>=0){const p=toScreen(0,0);ctx.beginPath();ctx.moveTo(0,p.y);ctx.lineTo(W,p.y);ctx.stroke();}
+    ctx.fillStyle='#999';ctx.font='10px sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='top';
+    for(let gx=gx0;gx<=vMaxX;gx+=gs){const p=toScreen(gx,vMinY);if(p.x>30&&p.x<W-10)ctx.fillText(fmtGrid(gx),p.x,H-14);}
+    ctx.textAlign='right';ctx.textBaseline='middle';
+    for(let gy=gy0;gy<=vMaxY;gy+=gs){const p=toScreen(vMinX,gy);if(p.y>10&&p.y<H-14)ctx.fillText(fmtGrid(gy),28,p.y);}
+    ctx.restore();
+
+    /* elements (undeformed) */
+    ctx.save(); ctx.strokeStyle='#3498db'; ctx.lineWidth=3;
+    for(const el of elements){
+        const ni=nodes.find(n=>n.id===el.node_i),nj=nodes.find(n=>n.id===el.node_j);
+        if(!ni||!nj)continue;
+        const p1=toScreen(ni.x,ni.y),p2=toScreen(nj.x,nj.y);
+        ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke();
+        /* pin release indicators: open circle at released end, offset slightly along element */
+        if(el.release_i_Mz||el.release_j_Mz){
+            const dx=p2.x-p1.x, dy=p2.y-p1.y, len=Math.hypot(dx,dy);
+            if(len>1){
+                const ux=dx/len, uy=dy/len;
+                ctx.save(); ctx.strokeStyle='#e67e22'; ctx.lineWidth=2; ctx.fillStyle='#fff';
+                if(el.release_i_Mz){const cx=p1.x+ux*12,cy=p1.y+uy*12;ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);ctx.fill();ctx.stroke();}
+                if(el.release_j_Mz){const cx=p2.x-ux*12,cy=p2.y-uy*12;ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);ctx.fill();ctx.stroke();}
+                ctx.restore();
+            }
+        }
+        /* element label at midspan */
+        ctx.save();ctx.fillStyle='#2471a3';ctx.font='9px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';
+        ctx.fillText('E'+el.id,(p1.x+p2.x)/2,(p1.y+p2.y)/2-6);ctx.restore();
+    }
+    ctx.restore();
+
+    /* BC supports */
+    const bcByNode={};
+    for(const b of bcs){if(!bcByNode[b.node_id])bcByNode[b.node_id]=new Set();bcByNode[b.node_id].add(b.dof);}
+    for(const[nid,dofs]of Object.entries(bcByNode)){
+        const nd=nodes.find(n=>n.id===parseInt(nid));if(!nd)continue;const p=toScreen(nd.x,nd.y);
+        if(dofs.has('u')&&dofs.has('v')&&dofs.has('rz'))drawFixedSupport(ctx,p.x,p.y);
+        else if(dofs.has('u')&&dofs.has('v'))drawPinnedSupport(ctx,p.x,p.y);
+        else if(dofs.has('v'))drawRollerSupport(ctx,p.x,p.y);
+        else drawGenericBC(ctx,p.x,p.y);
+    }
+
+    /* applied load arrows */
+    for(const ld of loads){const nd=nodes.find(n=>n.id===ld.node_id);if(!nd)continue;const p=toScreen(nd.x,nd.y);
+        if(ld.Fx||ld.Fy)drawForceArrow(ctx,p.x,p.y,ld.Fx,ld.Fy,'#c0392b','Applied');
+        if(ld.Mz)drawMomentArc(ctx,p.x,p.y,ld.Mz,'#8e44ad');
+    }
+
+    /* nodes */
+    for(const n of nodes){const p=toScreen(n.x,n.y);ctx.fillStyle='#2c3e50';ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='#333';ctx.font='11px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText('N'+n.id,p.x,p.y-8);}
+
+    /* selection ring */
+    if(selNodeId!==null){const nd=nodes.find(n=>n.id===selNodeId);if(nd){const p=toScreen(nd.x,nd.y);ctx.strokeStyle='#e74c3c';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,10,0,Math.PI*2);ctx.stroke();}}
+    /* add-element first highlight */
+    if(elemFirst){const nd=nodes.find(n=>n.id===elemFirst.id);if(nd){const p=toScreen(nd.x,nd.y);ctx.strokeStyle='#e67e22';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(p.x,p.y,12,0,Math.PI*2);ctx.stroke();}}
+
+    /* ── RESULTS OVERLAYS ── */
+    if(!R) return;
+
+    const showDefl  = document.getElementById('chk-defl').checked;
+    const showReact = document.getElementById('chk-react').checked;
+    const showSmd   = document.getElementById('chk-smd').checked;
+    const showMax   = document.getElementById('chk-maxima').checked;
+
+    /* Deflected shape (Hermite cubics, client-side) */
+    if(showDefl && R.displacements){
+        const d=R.displacements;
+        /* compute auto scale: max deflection -> 10% of viewport diagonal in pixels */
+        let maxD=0;
+        for(const n of nodes){const u=d[n.id*3],v=d[n.id*3+1];const m=Math.hypot(u,v);if(m>maxD)maxD=m;}
+        const diagPx=Math.hypot(W,H);
+        const deflScale = maxD>1e-12 ? (diagPx*0.10)/maxD * pxToWorld(1) : 1;
+        document.getElementById('defl-scale-label').textContent = maxD>1e-12 ? `Scale: ${deflScale.toFixed(0)}x` : '';
+
+        ctx.save(); ctx.strokeStyle='rgba(231,76,60,0.7)'; ctx.lineWidth=2; ctx.setLineDash([6,4]);
+        for(const el of elements){
+            const ni=nodes.find(n=>n.id===el.node_i),nj=nodes.find(n=>n.id===el.node_j);
+            if(!ni||!nj)continue;
+            const dx=nj.x-ni.x, dy=nj.y-ni.y, L=Math.hypot(dx,dy);
+            if(L<1e-12)continue;
+            const c=dx/L,s=dy/L; // cos,sin of element angle
+            /* end DOFs in local frame */
+            const ui=d[ni.id*3]*c+d[ni.id*3+1]*s;
+            const vi=-d[ni.id*3]*s+d[ni.id*3+1]*c;
+            const ti=d[ni.id*3+2];
+            const uj=d[nj.id*3]*c+d[nj.id*3+1]*s;
+            const vj=-d[nj.id*3]*s+d[nj.id*3+1]*c;
+            const tj=d[nj.id*3+2];
+
+            const NS=20;
+            ctx.beginPath();
+            for(let k=0;k<=NS;k++){
+                const xi=k/NS; const xL=xi*L;
+                /* Hermite shape functions (Cook 4th ed. eq 2.3-5) */
+                const H1=1-3*xi*xi+2*xi*xi*xi;
+                const H2=xL*(1-xi)*(1-xi);
+                const H3=3*xi*xi-2*xi*xi*xi;
+                const H4=xL*xi*(xi-1);
+                const vLocal=H1*vi+H2*ti+H3*vj+H4*tj;
+                const uLocal=ui+(uj-ui)*xi;
+                /* local deformed -> global */
+                const wxDef = ni.x + (xL+uLocal*deflScale)*c - vLocal*deflScale*s;
+                const wyDef = ni.y + (xL+uLocal*deflScale)*s + vLocal*deflScale*c;
+                const p=toScreen(wxDef,wyDef);
+                if(k===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
+            }
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    /* Reaction arrows (green) */
+    if(showReact && R.reactions){
+        const rxByNode={};
+        for(const rc of R.reactions){if(!rxByNode[rc.node_id])rxByNode[rc.node_id]={Fx:0,Fy:0,Mz:0};
+            if(rc.dof==='u')rxByNode[rc.node_id].Fx=rc.value;
+            if(rc.dof==='v')rxByNode[rc.node_id].Fy=rc.value;
+            if(rc.dof==='rz')rxByNode[rc.node_id].Mz=rc.value;}
+        for(const[nid,rv]of Object.entries(rxByNode)){
+            const nd=nodes.find(n=>n.id===parseInt(nid));if(!nd)continue;const p=toScreen(nd.x,nd.y);
+            if(Math.abs(rv.Fx)>1e-6||Math.abs(rv.Fy)>1e-6) drawForceArrow(ctx,p.x,p.y,rv.Fx,rv.Fy,'#27ae60','R');
+            if(Math.abs(rv.Mz)>1e-6) drawMomentArc(ctx,p.x,p.y,rv.Mz,'#27ae60');
+        }
+    }
+
+    /* SMD overlays (perpendicular to element, scaled) */
+    if(showSmd && R.diagrams){
+        const allVals=[];
+        for(const diag of R.diagrams) for(const st of diag.stations){allVals.push(Math.abs(st.V),Math.abs(st.M),Math.abs(st.N));}
+        const maxVal=Math.max(...allVals,1e-12);
+        const smdPxMax=60; // max perpendicular offset in pixels
+        const smdScale=smdPxMax/maxVal;
+
+        for(const diag of R.diagrams){
+            const el=elements.find(e=>e.id===diag.element_id);if(!el)continue;
+            const ni=nodes.find(n=>n.id===el.node_i),nj=nodes.find(n=>n.id===el.node_j);if(!ni||!nj)continue;
+            const dx=nj.x-ni.x,dy=nj.y-ni.y,L=Math.hypot(dx,dy);if(L<1e-12)continue;
+            const cx=dx/L,sy=dy/L;
+            /* perpendicular direction (screen): rotate element direction 90 CCW */
+            const pi=toScreen(ni.x,ni.y), pj=toScreen(nj.x,nj.y);
+            const ex=(pj.x-pi.x)/L, ey=(pj.y-pi.y)/L; // not normalized to world but to screen -- wait, we need screen perp
+            const elen=Math.hypot(pj.x-pi.x,pj.y-pi.y);
+            const tx=(pj.x-pi.x)/elen, ty=(pj.y-pi.y)/elen;
+            const nx=-ty, ny=tx; // screen-space normal
+
+            for(const [key,color,label] of [['M','rgba(142,68,173,0.6)','M'],['V','rgba(41,128,185,0.5)','V'],['N','rgba(230,126,34,0.5)','N']]){
+                ctx.save(); ctx.fillStyle=color; ctx.strokeStyle=color; ctx.lineWidth=1;
+                ctx.beginPath();
+                const pts=diag.stations;
+                // baseline start
+                const frac0=pts[0].x_local/L;
+                const bx0=pi.x+frac0*(pj.x-pi.x), by0=pi.y+frac0*(pj.y-pi.y);
+                ctx.moveTo(bx0,by0);
+                for(const st of pts){
+                    const frac=st.x_local/L;
+                    const bx=pi.x+frac*(pj.x-pi.x), by=pi.y+frac*(pj.y-pi.y);
+                    const val=st[key]*smdScale;
+                    ctx.lineTo(bx+nx*val, by+ny*val);
+                }
+                // close back along baseline
+                for(let i=pts.length-1;i>=0;i--){
+                    const frac=pts[i].x_local/L;
+                    ctx.lineTo(pi.x+frac*(pj.x-pi.x), pi.y+frac*(pj.y-pi.y));
+                }
+                ctx.closePath(); ctx.globalAlpha=0.3; ctx.fill(); ctx.globalAlpha=1.0; ctx.stroke();
+                /* label at max value station */
+                let maxSt=pts[0],maxV=0;
+                for(const st of pts){if(Math.abs(st[key])>maxV){maxV=Math.abs(st[key]);maxSt=st;}}
+                if(maxV>1e-6){
+                    const frac=maxSt.x_local/L;
+                    const bx=pi.x+frac*(pj.x-pi.x),by=pi.y+frac*(pj.y-pi.y);
+                    const val=maxSt[key]*smdScale;
+                    ctx.fillStyle=color.replace(/[\d.]+\)$/,'1)');ctx.font='9px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';
+                    ctx.fillText(label+'='+fmt(maxSt[key]),bx+nx*val,by+ny*val-3);
+                }
+                ctx.restore();
+            }
+        }
+    }
+
+    /* Maxima flags */
+    if(showMax && R.maxima){
+        const m=R.maxima;
+        /* deflection flag at node */
+        {const nd=nodes.find(n=>n.id===m.deflection.node_id);if(nd){const p=toScreen(nd.x,nd.y);drawFlag(ctx,p.x,p.y-20,'dmax='+fmt(m.deflection.value),'#e74c3c');}}
+        /* moment flag */
+        {const el=elements.find(e=>e.id===m.moment.element_id);if(el){
+            const ni=nodes.find(n=>n.id===el.node_i),nj=nodes.find(n=>n.id===el.node_j);if(ni&&nj){
+            const L=Math.hypot(nj.x-ni.x,nj.y-ni.y),frac=L>0?m.moment.station/L:0;
+            const wx=ni.x+frac*(nj.x-ni.x),wy=ni.y+frac*(nj.y-ni.y);const p=toScreen(wx,wy);
+            drawFlag(ctx,p.x,p.y+18,'Mmax='+fmt(m.moment.value),'#8e44ad');}}}
+    }
+}
+
+/* ── drawing helpers ── */
+function drawFixedSupport(ctx,x,y){const sz=14;ctx.save();ctx.fillStyle='#7f8c8d';ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-sz,y+sz);ctx.lineTo(x+sz,y+sz);ctx.closePath();ctx.fill();ctx.strokeStyle='#555';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x-sz,y+sz);ctx.lineTo(x+sz,y+sz);ctx.stroke();for(let i=-sz;i<=sz;i+=5){ctx.beginPath();ctx.moveTo(x+i,y+sz);ctx.lineTo(x+i-4,y+sz+5);ctx.stroke();}ctx.restore();}
+function drawPinnedSupport(ctx,x,y){const sz=12;ctx.save();ctx.fillStyle='#7f8c8d';ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-sz,y+sz);ctx.lineTo(x+sz,y+sz);ctx.closePath();ctx.fill();ctx.restore();}
+function drawRollerSupport(ctx,x,y){const sz=12;ctx.save();ctx.fillStyle='#7f8c8d';ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-sz,y+sz);ctx.lineTo(x+sz,y+sz);ctx.closePath();ctx.fill();ctx.fillStyle='#95a5a6';ctx.beginPath();ctx.arc(x-6,y+sz+4,3,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(x+6,y+sz+4,3,0,Math.PI*2);ctx.fill();ctx.restore();}
+function drawGenericBC(ctx,x,y){ctx.save();ctx.strokeStyle='#7f8c8d';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,8,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(x-5,y-5);ctx.lineTo(x+5,y+5);ctx.stroke();ctx.beginPath();ctx.moveTo(x+5,y-5);ctx.lineTo(x-5,y+5);ctx.stroke();ctx.restore();}
+
+function drawForceArrow(ctx,x,y,fx,fy,color,label){
+    const mag=Math.hypot(fx,fy);if(mag<1e-10)return;
+    const len=40;const dx=-(fx/mag)*len,dy=(fy/mag)*len;const tx=x+dx,ty=y+dy;
+    ctx.save();ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(tx,ty);ctx.lineTo(x,y);ctx.stroke();
+    const angle=Math.atan2(y-ty,x-tx),hl=10;
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-hl*Math.cos(angle-0.4),y-hl*Math.sin(angle-0.4));ctx.lineTo(x-hl*Math.cos(angle+0.4),y-hl*Math.sin(angle+0.4));ctx.closePath();ctx.fill();
+    ctx.font='9px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';
+    ctx.fillText(label+': '+fmt(fx)+','+fmt(fy),(x+tx)/2,Math.min(y,ty)-4);
+    ctx.restore();
+}
+
+function drawMomentArc(ctx,x,y,mz,color){
+    ctx.save();ctx.strokeStyle=color||'#8e44ad';ctx.lineWidth=2;
+    const r=16,start=-Math.PI*0.75,end=Math.PI*0.5,ccw=mz>0;
+    ctx.beginPath();ctx.arc(x,y,r,start,end,ccw);ctx.stroke();
+    const tipAngle=ccw?end:start;const tx=x+r*Math.cos(tipAngle),ty=y+r*Math.sin(tipAngle);
+    ctx.fillStyle=color||'#8e44ad';ctx.beginPath();ctx.arc(tx,ty,3,0,Math.PI*2);ctx.fill();
+    ctx.font='9px sans-serif';ctx.textAlign='center';ctx.fillText('M='+fmt(mz),x,y-r-4);
+    ctx.restore();
+}
+
+function drawFlag(ctx,x,y,text,color){
+    ctx.save();ctx.font='bold 9px sans-serif';const w=ctx.measureText(text).width+8;
+    ctx.fillStyle=color;ctx.globalAlpha=0.85;
+    ctx.beginPath();ctx.roundRect(x-w/2,y-12,w,14,3);ctx.fill();
+    ctx.globalAlpha=1;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(text,x,y-5);ctx.restore();
+}
+
+</script>
 </body>
 </html>

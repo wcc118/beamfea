@@ -13,7 +13,7 @@ This file is referenced by every module that computes or displays internal force
 This is what gets plotted on shear-moment-axial diagrams.
 
 - **Axial N:** positive in tension (element pulled apart).
-- **Shear V:** positive when it rotates the element segment clockwise. Equivalently, on a cut face whose outward normal is +local-x, positive V points in +local-y.
+- **Shear V:** positive when it rotates the element segment clockwise. On a cut face whose outward normal is +local-x (right face of left segment), the internal shear force in -local-y direction is taken as positive V (i.e., the right segment pushes the left segment's right face downward). This is the standard structural-analysis convention where positive V and positive dM/dx have opposite signs: dM/dx = -V.
 - **Moment M:** sagging-positive. On a cut face whose outward normal is +local-x, positive M is a vector in +local-z (CCW when viewed from +z), which produces tension on the +local-y face — i.e., the "bottom" fiber if the beam is drawn left-to-right with local-y up.
 
 ## Degrees of freedom

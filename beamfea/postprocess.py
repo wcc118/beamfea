@@ -17,7 +17,11 @@ from __future__ import annotations
 import numpy as np
 
 from beamfea.assembly import assemble_global_stiffness, assemble_nodal_loads
-from beamfea.element import element_stiffness_local, transformation_matrix
+from beamfea.element import (
+    condense_rotational_dof,
+    element_stiffness_local,
+    transformation_matrix,
+)
 
 
 def compute_element_end_forces(
@@ -77,6 +81,12 @@ def compute_element_end_forces(
 
         K_local = element_stiffness_local(E, A, Iz, L)
 
+        # Apply same condensation used during assembly so f = K*d is consistent
+        release_i = elem.get("release_i_Mz", False)
+        release_j = elem.get("release_j_Mz", False)
+        if release_i or release_j:
+            K_local = condense_rotational_dof(K_local, release_i, release_j)
+
         T = transformation_matrix(theta)
 
         gdof = [3 * node_i, 3 * node_i + 1, 3 * node_i + 2,
@@ -99,7 +109,15 @@ def compute_element_end_forces(
                 f_fixed[4] = w_transverse * L / 2
                 f_fixed[5] = -w_transverse * L**2 / 12
 
-        f_local = K_local @ d_element - f_fixed
+        # Transform global displacements to local frame before K_local multiplication
+        d_local = T @ d_element
+        f_local = K_local @ d_local - f_fixed
+
+        # Released ends carry zero moment by definition
+        if release_i:
+            f_local[2] = 0.0
+        if release_j:
+            f_local[5] = 0.0
 
         results.append({
             "element_id": elem_id,
@@ -119,10 +137,18 @@ def compute_internal_force_diagrams(
 
     Sampling stations: i-end (x=0), midspan (x=L/2), j-end (x=L)
 
-    Internal force functions (per §8):
-        N(x) = -N_i - w_a · x          (tension positive)
-        V(x) =  V_i + w_t · x          (clockwise positive)
-        M(x) =  M_i + V_i·x + w_t·x²/2
+    Internal force functions derived from equilibrium of segment [0, x],
+    where N_i, V_i, M_i are the element end-forces at the i-node from
+    ``compute_element_end_forces`` (forces the node applies to the element):
+
+        N(x) = -N_i - w_a · x           (tension positive)
+        V(x) =  V_i + w_t · x           (CW-positive per conventions.md §2)
+        M(x) =  M_i - V_i·x - w_t·x²/2 (sagging-positive per conventions.md §2)
+
+    The sign on V_i and w_t in the moment equation is negative because
+    a positive (upward) shear at the i-end produces a moment that
+    *decreases* the sagging moment as x increases (see Cook 4th ed. §2.3,
+    McGuire-Gallagher-Ziemer 2nd ed. Ch. 5 sign-convention discussion).
 
     Args:
         nodes: List of node dicts
@@ -166,7 +192,7 @@ def compute_internal_force_diagrams(
         for x in [0.0, L / 2.0, L]:
             N = -N_i - w_axial * x
             V = V_i + w_transverse * x
-            M = M_i + V_i * x + w_transverse * x**2 / 2.0
+            M = M_i - V_i * x - w_transverse * x**2 / 2.0
 
             dx_global = (x / L) * dx if L > 0 else 0.0
             dy_global = (x / L) * dy if L > 0 else 0.0
@@ -290,6 +316,115 @@ def compute_gpf_balance(
     residuals = Kd - (F + R)
 
     return residuals, max_forces, tolerance
+
+
+def compute_element_node_contributions(
+    nodes: list[dict],
+    elements: list[dict],
+    materials: list[dict],
+    d_full: np.ndarray,
+    element_loads: list[dict] = None,
+) -> list[dict]:
+    """Compute per-element force contributions at each node in global coords.
+
+    For each element, transforms the local end-force vector to global
+    coordinates via T^T, then splits into node-i and node-j contributions.
+    This enables free-body-diagram breakdowns at any node.
+
+    The sign convention: the contribution is the force the element exerts
+    *on the node* (i.e. the internal force vector in the global frame at
+    the element end attached to that node).
+
+    Ref: Cook 4th ed. §2.3 -- f_global = T^T * f_local
+
+    Args:
+        nodes: List of node dicts
+        elements: List of element dicts
+        materials: List of material dicts
+        d_full: Full displacement vector from solver
+        element_loads: Optional element load dicts
+
+    Returns:
+        List of dicts, one per element:
+        {
+            "element_id": int,
+            "node_i": int,
+            "node_j": int,
+            "forces_global": [Fx_i, Fy_i, Mz_i, Fx_j, Fy_j, Mz_j],
+            "contrib_i": {"Fx": float, "Fy": float, "Mz": float},
+            "contrib_j": {"Fx": float, "Fy": float, "Mz": float},
+        }
+    """
+    material_map = {m["id"]: m for m in materials}
+    loads_map = {load["element_id"]: load for load in (element_loads or [])}
+
+    results = []
+
+    for elem in elements:
+        elem_id = elem["id"]
+        ni_id = elem["node_i"]
+        nj_id = elem["node_j"]
+        mat = material_map[elem["material_id"]]
+        E, A, Iz = mat["E"], elem["A"], elem["Iz"]
+
+        ni = next(n for n in nodes if n["id"] == ni_id)
+        nj = next(n for n in nodes if n["id"] == nj_id)
+        dx = nj["x"] - ni["x"]
+        dy = nj["y"] - ni["y"]
+        L = np.sqrt(dx**2 + dy**2)
+        theta = np.arctan2(dy, dx)
+
+        K_local = element_stiffness_local(E, A, Iz, L)
+        release_i = elem.get("release_i_Mz", False)
+        release_j = elem.get("release_j_Mz", False)
+        if release_i or release_j:
+            K_local = condense_rotational_dof(K_local, release_i, release_j)
+        T = transformation_matrix(theta)
+
+        gdof = [3 * ni_id, 3 * ni_id + 1, 3 * ni_id + 2,
+                3 * nj_id, 3 * nj_id + 1, 3 * nj_id + 2]
+        d_elem = d_full[gdof]
+
+        f_fixed = np.zeros(6)
+        load = loads_map.get(elem_id)
+        if load:
+            wa = load.get("w_axial", 0.0)
+            wt = load.get("w_transverse", 0.0)
+            if wa != 0:
+                f_fixed[0] = wa * L / 2
+                f_fixed[3] = wa * L / 2
+            if wt != 0:
+                f_fixed[1] = wt * L / 2
+                f_fixed[2] = wt * L**2 / 12
+                f_fixed[4] = wt * L / 2
+                f_fixed[5] = -wt * L**2 / 12
+
+        d_local = T @ d_elem
+        f_local = K_local @ d_local - f_fixed
+        if release_i:
+            f_local[2] = 0.0
+        if release_j:
+            f_local[5] = 0.0
+        f_global = T.T @ f_local
+
+        results.append({
+            "element_id": elem_id,
+            "node_i": ni_id,
+            "node_j": nj_id,
+            "forces_global": f_global.tolist(),
+            "contrib_i": {
+                "Fx": f_global[0],
+                "Fy": f_global[1],
+                "Mz": f_global[2],
+            },
+            "contrib_j": {
+                "Fx": f_global[3],
+                "Fy": f_global[4],
+                "Mz": f_global[5],
+            },
+        })
+
+    return results
 
 
 def compute_stresses(

@@ -37,17 +37,19 @@
 - **Data model:** Pydantic v2 schemas in `beamfea/schema.py`
 - **Element:** stiffness matrix, transformation, end-release condensation (`beamfea/element.py`)
 - **Assembly:** global K/F assembly via scipy.sparse CSR (`beamfea/assembly.py`)
-- **Solver:** partitioned matrix solve with BC handling (`beamfea/solver.py`)
-- **Postprocess:** end forces, SMD diagrams, GPF balance, stress (`beamfea/postprocess.py`)
-- **API:** FastAPI server on port 1337 (`beamfea/api.py`)
-- **I/O:** JSON load/save with schema versioning (`beamfea/io.py`)
+- **Solver:** partitioned matrix solve with BC handling, reaction computation (`beamfea/solver.py`)
+- **Postprocess:** end forces (with T@d local-frame transform), internal force diagrams (M(x)=M_i-V_i*x), element-node contributions for freebody breakdown, GPF balance, stress, maxima (`beamfea/postprocess.py`)
+- **API:** FastAPI server on port 1337; `/model`, `/solve`, `/results` (includes reactions + element contributions), `/diagram` PNG endpoint (`beamfea/api.py`)
+- **I/O:** JSON load/save with schema versioning, CSV export (`beamfea/io.py`)
+- **Frontend:** single-page GUI served at `/` (`beamfea/frontend/index.html`): canvas with auto-scaling viewport, zoom (wheel + box-select), pan (right-drag), mode toolbar (Select, +Node, +Element, +BC, +Load, Zoom Box, Fit), sticky creation modes, node coordinate entry via modal, element properties with pin releases, results overlay (deflected shape via Hermite cubics, reaction arrows, SMD curves, maxima flags), Node Forces tab with freebody checkbox breakdown
 
 ---
 
 ## Critical conventions
 
 - **DOF order:** [u, v, θz] per node; gdof = 3·node_id + k (zero-indexed nodes)
-- **Sign convention:** tension +N, clockwise shear +V, sagging +M (cite `conventions.md` in every numerical module)
+- **Sign convention:** tension +N, clockwise shear +V, sagging +M (cite `conventions.md` in every numerical module). Internal moment integration: dM/dx = -V, so M(x) = M_i - V_i*x - w*x^2/2.
+- **End-force recovery:** f_local = K_local @ (T @ d_global) - f_fixed. The T@d transformation is essential for non-horizontal elements. Released ends (pin) are zeroed: f_local[2]=0 if release_i, f_local[5]=0 if release_j.
 - **Units:** inch, lb, psi (no conversions in v1)
 - **Textbook references:** Cook 4th ed. or McGuire-Gallagher-Ziemer 2nd ed. — cite in docstrings for all stiffness/shape-function formulas
 
@@ -56,9 +58,10 @@
 ## Validation suite
 
 - **Location:** `tests/validation/`
-- **Run:** `pytest` parametrizes over all V{1–9,8b} pairs
+- **Run:** `pytest` parametrizes over all V{1-9,8b} pairs
 - **Format:** `V{N}_model.json` + `V{N}_expected.json`
 - **Tolerance:** 0.01% relative error on all checks
+- **Current count:** 68 tests (assembly, element, postprocess, solver validations, API, I/O)
 
 ---
 

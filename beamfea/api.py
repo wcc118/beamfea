@@ -22,13 +22,14 @@ from fastapi.responses import Response
 
 from beamfea.postprocess import (
     compute_element_end_forces,
+    compute_element_node_contributions,
     compute_gpf_balance,
     compute_internal_force_diagrams,
     compute_maxima,
     compute_stresses,
 )
 from beamfea.schema import Model
-from beamfea.solver import solve_linear_static
+from beamfea.solver import compute_reactions, solve_linear_static
 
 app = FastAPI(title="beamfea API", version="0.1.0")
 
@@ -132,6 +133,37 @@ def post_solve(model_id: str) -> dict[str, str]:
             nodes=dicts["nodes"],
         )
 
+        # Compute reactions at constrained DOFs
+        R = compute_reactions(
+            nodes=dicts["nodes"],
+            elements=dicts["elements"],
+            materials=dicts["materials"],
+            bcs=dicts["bcs"],
+            nodal_loads=dicts["nodal_loads"],
+            d_full=d_full,
+            element_loads=dicts["element_loads"],
+        )
+
+        # Per-element global force contributions at nodes
+        elem_contribs = compute_element_node_contributions(
+            nodes=dicts["nodes"],
+            elements=dicts["elements"],
+            materials=dicts["materials"],
+            d_full=d_full,
+            element_loads=dicts["element_loads"],
+        )
+
+        # Build per-BC reaction list
+        dof_map = {"u": 0, "v": 1, "rz": 2}
+        reactions_list = []
+        for bc in dicts["bcs"]:
+            gdof = 3 * bc["node_id"] + dof_map[bc["dof"]]
+            reactions_list.append({
+                "node_id": bc["node_id"],
+                "dof": bc["dof"],
+                "value": float(R[gdof]),
+            })
+
         # Cache results
         solve_results[model_id] = {
             "status": "solved",
@@ -145,6 +177,8 @@ def post_solve(model_id: str) -> dict[str, str]:
             },
             "stresses": stresses,
             "maxima": maxima,
+            "reactions": reactions_list,
+            "element_contributions": elem_contribs,
         }
 
         return {"status": "solved"}

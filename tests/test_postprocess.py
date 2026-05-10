@@ -11,6 +11,7 @@ import pytest
 
 from beamfea.postprocess import (
     compute_element_end_forces,
+    compute_element_node_contributions,
     compute_internal_force_diagrams,
     compute_gpf_balance,
     compute_stresses,
@@ -70,14 +71,15 @@ def test_internal_force_diagram_v1():
     # Check 3 stations: i-end, midspan, j-end
     stations = diagrams[0]['stations']
 
-    # x=0 (i-end): M should be ~120000 (sagging)
-    assert np.isclose(stations[0]['M'], 120000.0, atol=1e-6)
-
-    # x=L/2 (mid): M should be 180000
-    assert np.isclose(stations[1]['M'], 180000.0, atol=1e-6)
-
-    # x=L (j-end): M should be 240000 (P*L = 1000*120)
-    assert np.isclose(stations[2]['M'], 240000.0, atol=1e-6)
+    # V1: cantilever L=120, P=-1000 at tip (node 1)
+    # Internal moment (sagging positive): M(x) = P_mag * (L - x)
+    # Formula: M(x) = M_i - V_i*x where M_i=+120000, V_i=+1000
+    P, L = 1000.0, 120.0
+    expected_M = [P * (L - x) for x in [0.0, L / 2.0, L]]  # [120000, 60000, 0]
+    for i, (st, em) in enumerate(zip(stations, expected_M)):
+        assert np.isclose(st['M'], em, atol=1e-6), (
+            f"station {i}: M={st['M']}, expected={em}"
+        )
 
     # Shear should be constant = 1000 along length
     for station in stations:
@@ -171,9 +173,9 @@ def test_maxima_v1():
     assert maxima['deflection']['node_id'] == 1
     assert np.isclose(maxima['deflection']['value'], 55.922330097087375, atol=0.01)
 
-    # Max moment at tip (j-end)
+    # Max moment at fixed end (i-end, x=0): M = P*L = 1000*120 = 120000
     assert maxima['moment']['element_id'] == 0
-    assert np.isclose(maxima['moment']['value'], 240000.0, atol=1e-6)
+    assert np.isclose(maxima['moment']['value'], 120000.0, atol=1e-6)
 
     # Max shear is constant = 1000
     assert np.isclose(maxima['shear']['value'], 1000.0, atol=1e-6)
@@ -253,19 +255,20 @@ def test_internal_force_diagram_v2():
 
     stations = diagrams[0]['stations']
 
-    # V2: cantilever, w = -10 lb/in (downward)
-    # From end_forces: V_i = 1200, M_i = 72000, V_j = 0, M_j = 0
-    # V(x) = V_i + w*x = 1200 - 10*x
-    # M(x) = M_i + V_i*x + w*x^2/2 = 72000 + 1200*x - 5*x^2
+    # V2: cantilever L=120, w = -10 lb/in (downward UDL)
+    # End forces: V_i = +1200, M_i = +72000
+    # Corrected moment integration (sagging positive):
+    #   M(x) = M_i - V_i*x - w*x^2/2 = 72000 - 1200*x + 5*x^2
+    # Physics check: M(x) = |w|*(L-x)^2/2 = 10*(120-x)^2/2 = 5*(120-x)^2
+    L = 120.0
+    w_abs = 10.0  # magnitude of UDL
+    expected_M = [w_abs * (L - x)**2 / 2.0 for x in [0.0, L / 2.0, L]]
+    # = [72000, 18000, 0]
 
-    # At x=0: V = 1200, M = 72000
-    # At x=60: V = 1200 - 600 = 600, M = 72000 + 72000 - 18000 = 126000
-    # At x=120: V = 1200 - 1200 = 0, M = 72000 + 144000 - 72000 = 144000
-
-    # Check moment values
-    assert np.isclose(stations[0]['M'], 72000.0, atol=1e-3)
-    assert np.isclose(stations[1]['M'], 126000.0, atol=1e-3)
-    assert np.isclose(stations[2]['M'], 144000.0, atol=1e-3)
+    for i, (st, em) in enumerate(zip(stations, expected_M)):
+        assert np.isclose(st['M'], em, atol=1e-3), (
+            f"station {i}: M={st['M']}, expected={em}"
+        )
 
 
 def test_maxima_v2():
@@ -291,7 +294,47 @@ def test_maxima_v2():
     # Max deflection at tip (node 1)
     assert maxima['deflection']['node_id'] == 1
 
-    # Max moment at j-end (x=120): M = 144000
-    # The moment diagram is quadratic, max at j-end for cantilever with UDL
+    # Max moment at i-end (x=0): M = wL^2/2 = 10*120^2/2 = 72000
+    # For a cantilever with UDL, max moment is at the fixed end (station 0).
     assert maxima['moment']['element_id'] == 0
-    assert maxima['moment']['station'] == 120.0
+    assert maxima['moment']['station'] == 0.0
+    assert np.isclose(maxima['moment']['value'], 72000.0, atol=1e-3)
+
+
+def test_element_node_contributions_v1():
+    """V1: Cantilever, tip load. Verify element contributions at each node.
+
+    At node 0 (fixed end), the single element should contribute:
+    - Fy = +1000 lb (element pushes node upward = reaction)
+    - Mz = +120000 lb-in (element pushes node with moment = reaction)
+    At node 1 (tip), the element should contribute:
+    - Fy = -1000 lb (element pulls node downward = applied load direction)
+    """
+    with open('tests/validation/V1_model.json') as f:
+        model = json.load(f)
+
+    nodes = model['nodes']
+    elements = model['elements']
+    materials = model['materials']
+    bcs_list = model['bcs']
+    nodal_loads = model['nodal_loads']
+
+    d_full, _, _ = solve_linear_static(nodes, elements, materials, bcs_list, nodal_loads, [])
+
+    contribs = compute_element_node_contributions(nodes, elements, materials, d_full, [])
+
+    assert len(contribs) == 1
+    c = contribs[0]
+    assert c['element_id'] == 0
+    assert c['node_i'] == 0
+    assert c['node_j'] == 1
+
+    # At fixed end (node 0), element reaction should balance:
+    # Formula: R_y = P = 1000 lb, R_mz = P*L = 1000*120 = 120000 lb-in
+    assert np.isclose(c['contrib_i']['Fy'], 1000.0, atol=1e-6)
+    assert np.isclose(c['contrib_i']['Mz'], 120000.0, atol=1e-3)
+    assert np.isclose(c['contrib_i']['Fx'], 0.0, atol=1e-6)
+
+    # At tip (node 1), element end force Fy = -1000 (equal and opposite)
+    assert np.isclose(c['contrib_j']['Fy'], -1000.0, atol=1e-6)
+    assert np.isclose(c['contrib_j']['Mz'], 0.0, atol=1e-3)

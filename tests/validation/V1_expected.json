@@ -36,8 +36,8 @@
       "element_id": 0,
       "end": "i",
       "component": "M",
-      "value": -120000.0,
-      "note": "Internal M at i-end is the negative of the reaction moment for sign-convention consistency; verify per conventions.md §2 during implementation."
+      "value": 120000.0,
+      "formula": "M_i from K*d = reaction moment = P*L = 1000*120 = 120000 lb-in (sagging positive at fixed end of cantilever with downward tip load)"
     }
   ]
 }
