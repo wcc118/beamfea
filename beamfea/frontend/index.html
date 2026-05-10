@@ -15,11 +15,16 @@
         .center { flex: 1; background: #fff; position: relative; }
         .right { flex: 0 0 300px; background: #f8f9fa; }
         .pane-title { background: #e9ecef; padding: 8px; margin: -10px -10px 10px -10px; font-weight: bold; border-bottom: 1px solid #ddd; }
-        .tree-node { padding: 4px 8px; margin: 2px 0; background: #fff; border-radius: 4px; border: 1px solid #dee2e6; font-size: 0.9rem; }
+        .tree-node { padding: 4px 8px; margin: 2px 0; background: #fff; border-radius: 4px; border: 1px solid #dee2e6; font-size: 0.9rem; cursor: pointer; }
         .tree-node:hover { background: #e2e6ea; }
         .tree-node.expanded { background: #e9ecef; }
-        .tree-node > .toggle { cursor: pointer; user-select: none; width: 20px; display: inline-block; text-align: center; }
-        .canvas-container { width: 100%; height: calc(100% - 60px); }
+        .tree-node > .toggle { user-select: none; width: 20px; display: inline-block; text-align: center; }
+        .tree-content { display: block; padding-left: 20px; }
+        .canvas-container { width: 100%; height: calc(100% - 60px); position: relative; }
+        .mode-bar { position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10; display: flex; gap: 5px; }
+        .mode-btn { padding: 6px 12px; border: 1px solid #ddd; background: #f0f0f0; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+        .mode-btn.active { background: #3498db; color: white; border-color: #2980b9; }
+        .mode-btn:hover:not(.active) { background: #e0e0e0; }
         canvas { display: block; }
         .controls { padding: 10px; border-bottom: 1px solid #ddd; }
         button { padding: 8px 16px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; }
@@ -34,9 +39,11 @@
         .data-table th { background: #e9ecef; text-align: left; padding: 4px 8px; border-bottom: 1px solid #dee2e6; }
         .data-table td { padding: 4px 8px; border-bottom: 1px solid #f1f1f1; }
         .data-table tr:last-child td { border-bottom: none; }
-        .diagram { text-align: center; }
+        .diagram { text-align: center; margin-bottom: 15px; }
         .diagram img { max-width: 100%; border: 1px solid #dee2e6; }
-        .status-bar { padding: 5px 10px; background: #e9ecef; font-size: 0.8rem; }
+        .status-bar { padding: 5px 10px; background: #e9ecef; font-size: 0.8rem; display: flex; flex-direction: column; }
+        .mode-label { font-weight: bold; color: #2980b9; }
+        .help-text { color: #666; font-size: 0.8rem; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
         .modal.active { display: flex; align-items: center; justify-content: center; }
         .modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; }
@@ -48,6 +55,8 @@
         .field input, .field select { width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; }
         .field-group { display: flex; gap: 10px; }
         .field-group .field { flex: 1; }
+        .bc-icon { display: inline-block; width: 20px; height: 20px; vertical-align: middle; margin-right: 8px; }
+        .load-icon { display: inline-block; width: 20px; height: 20px; vertical-align: middle; margin-right: 8px; }
     </style>
 </head>
 <body>
@@ -66,15 +75,22 @@
         <div class="pane center">
             <div class="pane-title">
                 <span>Canvas</span>
-                <span style="float: right;">
-                    <button id="add-node-btn">Add Node</button>
-                    <button id="add-element-btn">Add Element</button>
-                </span>
+                <div class="mode-bar">
+                    <button class="mode-btn active" data-mode="select">Select</button>
+                    <button class="mode-btn" data-mode="add-node">Add Node</button>
+                    <button class="mode-btn" data-mode="add-element">Add Element</button>
+                    <button class="mode-btn" data-mode="add-bc">Add BC</button>
+                    <button class="mode-btn" data-mode="add-load">Add Load</button>
+                </div>
             </div>
             <div class="canvas-container">
                 <canvas id="canvas"></canvas>
             </div>
-            <div class="status-bar" id="status-bar">Ready</div>
+            <div class="status-bar">
+                <span class="mode-label" id="mode-label">Mode: Select</span>
+                <span class="help-text" id="help-text">Click node to select, or use toolbar buttons</span>
+                <span class="snap-coords" id="snap-coords"></span>
+            </div>
         </div>
         <div class="pane right">
             <div class="pane-title">Results</div>
@@ -126,7 +142,7 @@
     <!-- BC Modal -->
     <div id="bc-modal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">Boundary Conditions</div>
+            <div class="modal-header">Add Boundary Condition</div>
             <div class="modal-body">
                 <div class="field-group">
                     <div class="field">
@@ -144,11 +160,11 @@
                 </div>
                 <div class="field">
                     <label>Value</label>
-                    <input type="number" id="bc-value" value="0">
+                    <input type="number" id="bc-value" value="0" step="any">
                 </div>
             </div>
             <div class="modal-footer">
-                <button id="bc-save">Set</button>
+                <button id="bc-save">Add BC</button>
                 <button id="bc-cancel">Cancel</button>
             </div>
         </div>
@@ -157,7 +173,7 @@
     <!-- Load Modal -->
     <div id="load-modal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">Load</div>
+            <div class="modal-header">Add Nodal Load</div>
             <div class="modal-body">
                 <div class="field-group">
                     <div class="field">
@@ -181,14 +197,13 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button id="load-save">Add</button>
+                <button id="load-save">Add Load</button>
                 <button id="load-cancel">Cancel</button>
             </div>
         </div>
     </div>
 
     <input type="file" id="file-input" accept=".beamfea.json" style="display: none;">
-
 
     <script>
         // API Configuration
@@ -199,13 +214,31 @@
         let bcs = [];
         let nodalLoads = [];
         let selectedNodeId = null;
-        let clickState = null; // 'first' or 'second' node for element creation
+        let addElementState = null; // {nodeId, x, y} of first node
+        let clickMode = 'select'; // select, add-node, add-element, add-bc, add-load
+
+        // Canvas scaling: 1 inch = 4 pixels, fixed viewport 0 to 300 inches
+        const SCALE = 4; // pixels per inch
+        const CANVAS_MIN_X = 0;
+        const CANVAS_MAX_X = 300;
+        const CANVAS_MIN_Y = 0;
+        const CANVAS_MAX_Y = 200;
+        const GRID_MAJOR = 12; // inches
+        const GRID_MINOR = 1; // inches
 
         document.addEventListener('DOMContentLoaded', init);
 
         function init() {
             setupEventListeners();
+            resizeCanvas();
             updateModelTree();
+        }
+
+        function resizeCanvas() {
+            const container = document.querySelector('.canvas-container');
+            const canvas = document.getElementById('canvas');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight - 40;
         }
 
         function setupEventListeners() {
@@ -220,12 +253,29 @@
                 });
             });
 
+            // Mode buttons
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    clickMode = btn.dataset.mode;
+                    updateModeLabel();
+                });
+            });
+
             // Canvas events
             const canvas = document.getElementById('canvas');
             canvas.addEventListener('click', handleCanvasClick);
-            canvas.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                handleRightClick(e);
+            window.addEventListener('resize', resizeCanvas);
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    clickMode = 'select';
+                    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelector('[data-mode="select"]').classList.add('active');
+                    updateModeLabel();
+                    e.stopPropagation();
+                    e.preventDefault();
+                }
             });
 
             // Buttons
@@ -233,8 +283,6 @@
             document.getElementById('save-btn').addEventListener('click', saveModel);
             document.getElementById('load-btn').addEventListener('click', () => document.getElementById('file-input').click());
             document.getElementById('file-input').addEventListener('change', loadModelFromFile);
-            document.getElementById('add-node-btn').addEventListener('click', addNodeClick);
-            document.getElementById('add-element-btn').addEventListener('click', addElementClick);
 
             // Modal controls
             document.getElementById('bc-cancel').addEventListener('click', () => toggleModal('bc-modal', false));
@@ -243,48 +291,42 @@
             document.getElementById('load-save').addEventListener('click', saveLoad);
         }
 
+        function updateModeLabel() {
+            const labels = {
+                'select': 'Select - Click node to select',
+                'add-node': 'Add Node - Click on canvas to place',
+                'add-element': 'Add Element - Click two nodes',
+                'add-bc': 'Add BC - Click node',
+                'add-load': 'Add Load - Click node'
+            };
+            document.getElementById('mode-label').textContent = `Mode: ${labels[clickMode]}`;
+            document.getElementById('help-text').textContent = clickMode === 'add-node' ? 'Snap to 1-inch grid. X=Right, Y=Up' :
+                clickMode === 'add-element' ? 'Click first node, then second node' :
+                clickMode === 'add-bc' ? 'Select DOF and value in modal' :
+                clickMode === 'add-load' ? 'Enter force values in modal' : '';
+        }
+
         async function solveModel() {
             document.getElementById('status-bar').textContent = 'Solving...';
             document.getElementById('solve-btn').disabled = true;
 
             try {
-                // Build model object from JS state
-                const model = {
-                    schema_version: "1.0",
-                    name: "Custom Model",
-                    nodes: nodes,
-                    materials: [{ id: 0, E: 10300000.0, nu: 0.33 }],
-                    elements: elements,
-                    bcs: bcs,
-                    nodal_loads: nodalLoads,
-                    element_loads: []
-                };
-
-                // POST to /model
-                const modelResp = await fetch(`${API_BASE}/model`, {
+                const model = buildModel();
+                const resp = await fetch(`${API_BASE}/model`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(model)
                 });
 
-                if (!modelResp.ok) {
-                    throw new Error(`Failed to post model: ${modelResp.status}`);
-                }
+                if (!resp.ok) throw new Error(`Failed to post model: ${resp.status}`);
+                const data = await resp.json();
+                currentModelId = data.model_id;
 
-                const modelData = await modelResp.json();
-                currentModelId = modelData.model_id;
-
-                // POST to /solve
                 const solveResp = await fetch(`${API_BASE}/solve/${currentModelId}`, {method: 'POST'});
-                if (!solveResp.ok) {
-                    throw new Error(`Solve failed: ${solveResp.statusText}`);
-                }
+                if (!solveResp.ok) throw new Error(`Solve failed: ${solveResp.statusText}`);
 
-                // Fetch results
                 const resultsResp = await fetch(`${API_BASE}/results/${currentModelId}`);
-                if (!resultsResp.ok) {
-                    throw new Error(`Failed to fetch results: ${resultsResp.statusText}`);
-                }
+                if (!resultsResp.ok) throw new Error(`Failed to fetch results: ${resultsResp.statusText}`);
 
                 const results = await resultsResp.json();
                 showResults(results);
@@ -297,259 +339,8 @@
             }
         }
 
-        function showResults(results) {
-            document.getElementById('reactions-table').innerHTML = '';
-            document.getElementById('gpf-table').innerHTML = '';
-            document.getElementById('maxima-values').innerHTML = '';
-
-            // Reactions
-            const reactionsDiv = document.getElementById('reactions-table');
-            if (results.gpf_balance) {
-                const residuals = results.gpf_balance.residuals;
-                let html = '<table class="data-table"><thead><tr><th>Node</th><th>DOF</th><th>Residual</th></tr></thead><tbody>';
-                for (let i = 0; i < residuals.length; i += 3) {
-                    const node = i / 3;
-                    html += `<tr><td>${node}</td><td>u</td><td>${residuals[i].toExponential(2)}</td></tr>`;
-                    html += `<tr><td>${node}</td><td>v</td><td>${residuals[i+1].toExponential(2)}</td></tr>`;
-                    html += `<tr><td>${node}</td><td>rz</td><td>${residuals[i+2].toExponential(2)}</td></tr>`;
-                }
-                html += '</tbody></table>';
-                reactionsDiv.innerHTML = html;
-            }
-
-            // GPF
-            const gpfDiv = document.getElementById('gpf-table');
-            if (results.gpf_balance) {
-                const maxResidual = Math.max(...results.gpf_balance.residuals.map(Math.abs));
-                const tolerance = results.gpf_balance.tolerance;
-                gpfDiv.innerHTML = `
-                    <p>Max residual: ${maxResidual.toExponential(4)}</p>
-                    <p>Tolerance: ${tolerance.toExponential(4)}</p>
-                    <p>Status: ${maxResidual <= tolerance ? 'PASS' : 'FAIL'}</p>
-                `;
-            }
-
-            // Maxima
-            const maximaDiv = document.getElementById('maxima-values');
-            if (results.maxima) {
-                const m = results.maxima;
-                maximaDiv.innerHTML = `
-                    <table class="data-table">
-                        <tr><th>Quantity</th><th>Value</th><th>Location</th></tr>
-                        <tr><td>Deflection (max)</td><td>${m.deflection.value.toExponential(4)}</td><td>Node ${m.deflection.node_id} (${m.deflection.x.toFixed(1)},${m.deflection.y.toFixed(1)})</td></tr>
-                        <tr><td>Moment (max)</td><td>${m.moment.value.toExponential(4)}</td><td>Element ${m.moment.element_id}, station ${m.moment.station.toFixed(1)}</td></tr>
-                        <tr><td>Shear (max)</td><td>${m.shear.value.toExponential(4)}</td><td>Element ${m.shear.element_id}, station ${m.shear.station.toFixed(1)}</td></tr>
-                        <tr><td>Axial (max)</td><td>${m.axial.value.toExponential(4)}</td><td>Element ${m.axial.element_id}, station ${m.axial.station.toFixed(1)}</td></tr>
-                        <tr><td>Stress (max)</td><td>${m.stress.value.toExponential(4)}</td><td>Element ${m.stress.element_id}, station ${m.stress.station.toFixed(1)}</td></tr>
-                    </table>
-                `;
-            }
-
-            // Diagrams
-            renderDiagrams(results.diagrams);
-        }
-
-        async function renderDiagrams(diagrams) {
-            for (const diagram of diagrams) {
-                const elementId = diagram.element_id;
-                for (const type of ['axial', 'shear', 'moment']) {
-                    const resp = await fetch(`${API_BASE}/diagram/${currentModelId}/${elementId}/${type}`);
-                    if (resp.ok) {
-                        const pngBlob = await resp.blob();
-                        const url = URL.createObjectURL(pngBlob);
-
-                        const container = document.getElementById(`${type}-diagrams`);
-                        const div = document.createElement('div');
-                        div.className = 'diagram';
-                        div.innerHTML = `<strong>Element ${elementId} - ${type.charAt(0).toUpperCase() + type.slice(1)} Force</strong><br><img src="${url}" style="max-width: 100%; border: 1px solid #ddd;">`;
-                        container.appendChild(div);
-                    }
-                }
-            }
-        }
-
-        function addNodeClick() {
-            const id = nodes.length;
-            const node = { id, x: (id + 1) * 60, y: 0 };
-            nodes.push(node);
-            clickState = null;
-            updateModelTree();
-            drawCanvas();
-            saveBtnEnabled();
-        }
-
-        function addElementClick() {
-            if (clickState === null) {
-                alert('Click an existing node first, then click another node to create an element');
-                return;
-            }
-
-            if (clickState.type === 'node') {
-                const id = elements.length;
-                elements.push({
-                    id,
-                    node_i: clickState.nodeId,
-                    node_j: nodes.length > 0 ? nodes[nodes.length - 1].id : nodes.length - 1,
-                    material_id: 0,
-                    A: 1.0,
-                    Iz: 1.0
-                });
-                clickState = null;
-                updateModelTree();
-                drawCanvas();
-                saveBtnEnabled();
-            }
-        }
-
-        function handleCanvasClick(e) {
-            const canvas = document.getElementById('canvas');
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            // Inverse transform
-            let minX = Math.min(...nodes.map(n => n.x), 0);
-            let maxX = Math.max(...nodes.map(n => n.x), 100);
-            let minY = Math.min(...nodes.map(n => n.y), 0);
-            let maxY = Math.max(...nodes.map(n => n.y), 100);
-
-            if (minX === maxX) maxX = minX + 100;
-            if (minY === maxY) maxY = minY + 100;
-
-            const padding = 50;
-            const scale = Math.min(
-                (canvas.width - 2 * padding) / (maxX - minX),
-                (canvas.height - 2 * padding) / (maxY - minY)
-            );
-
-            const offsetX = padding + (canvas.width - 2 * padding) / 2 - (minX + maxX) / 2 * scale;
-            const offsetY = canvas.height - padding - (minY + maxY) / 2 * scale;
-
-            const worldX = (x - offsetX) / scale;
-            const worldY = -(y - offsetY) / scale;
-
-            // Find nearest node
-            let nearestNode = null;
-            let minDist = 20 / scale;
-
-            for (const node of nodes) {
-                const dist = Math.sqrt((node.x - worldX) ** 2 + (node.y - worldY) ** 2);
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearestNode = node;
-                }
-            }
-
-            if (nearestNode) {
-                selectNode(nearestNode.id, nearestNode.x, nearestNode.y);
-            } else {
-                // Clicked empty space - add new node
-                const id = nodes.length;
-                const node = { id, x: worldX, y: worldY };
-                nodes.push(node);
-                clickState = { type: 'node', nodeId: id };
-                updateModelTree();
-                drawCanvas();
-                saveBtnEnabled();
-                document.getElementById('status-bar').textContent = `Added node ${id} at (${worldX.toFixed(1)}, ${worldY.toFixed(1)})`;
-            }
-        }
-
-        function selectNode(id, x, y) {
-            selectedNodeId = id;
-            document.getElementById('bc-node-id').value = id;
-            document.getElementById('load-node-id').value = id;
-            clickState = { type: 'node', nodeId: id };
-            document.getElementById('status-bar').textContent = `Selected node ${id}`;
-        }
-
-        function handleRightClick(e) {
-            e.preventDefault();
-            const canvas = document.getElementById('canvas');
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            // Similar inverse transform
-            let minX = Math.min(...nodes.map(n => n.x), 0);
-            let maxX = Math.max(...nodes.map(n => n.x), 100);
-            let minY = Math.min(...nodes.map(n => n.y), 0);
-            let maxY = Math.max(...nodes.map(n => n.y), 100);
-
-            if (minX === maxX) maxX = minX + 100;
-            if (minY === maxY) maxY = minY + 100;
-
-            const padding = 50;
-            const scale = Math.min(
-                (canvas.width - 2 * padding) / (maxX - minX),
-                (canvas.height - 2 * padding) / (maxY - minY)
-            );
-
-            const offsetX = padding + (canvas.width - 2 * padding) / 2 - (minX + maxX) / 2 * scale;
-            const offsetY = canvas.height - padding - (minY + maxY) / 2 * scale;
-
-            const worldX = (x - offsetX) / scale;
-            const worldY = -(y - offsetY) / scale;
-
-            let nearestNode = null;
-            let minDist = 20 / scale;
-
-            for (const node of nodes) {
-                const dist = Math.sqrt((node.x - worldX) ** 2 + (node.y - worldY) ** 2);
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearestNode = node;
-                }
-            }
-
-            if (nearestNode) {
-                document.getElementById('load-node-id').value = nearestNode.id;
-                toggleModal('load-modal', true);
-            }
-        }
-
-        function toggleModal(id, show) {
-            const modal = document.getElementById(id);
-            if (show) {
-                modal.classList.add('active');
-            } else {
-                modal.classList.remove('active');
-            }
-        }
-
-        function saveBc() {
-            const nodeId = parseInt(document.getElementById('bc-node-id').value);
-            const dof = document.getElementById('bc-dof').value;
-            const value = parseFloat(document.getElementById('bc-value').value);
-
-            // Add BC to bcs array
-            const bc = { node_id: nodeId, dof, value };
-            bcs.push(bc);
-
-            updateModelTree();
-            drawCanvas();
-            toggleModal('bc-modal', false);
-            document.getElementById('status-bar').textContent = `Added BC at node ${nodeId}, ${dof}=${value}`;
-        }
-
-        function saveLoad() {
-            const nodeId = parseInt(document.getElementById('load-node-id').value);
-            const Fx = parseFloat(document.getElementById('load-fx').value);
-            const Fy = parseFloat(document.getElementById('load-fy').value);
-            const Mz = parseFloat(document.getElementById('load-mz').value);
-
-            // Add load to nodalLoads array
-            const load = { node_id: nodeId, Fx: isNaN(Fx) ? 0 : Fx, Fy: isNaN(Fy) ? 0 : Fy, Mz: isNaN(Mz) ? 0 : Mz };
-            nodalLoads.push(load);
-
-            updateModelTree();
-            drawCanvas();
-            toggleModal('load-modal', false);
-            document.getElementById('status-bar').textContent = `Added load at node ${nodeId}`;
-        }
-
-        function saveModel() {
-            const model = {
+        function buildModel() {
+            return {
                 schema_version: "1.0",
                 name: "Custom Model",
                 nodes: nodes,
@@ -559,7 +350,204 @@
                 nodal_loads: nodalLoads,
                 element_loads: []
             };
+        }
 
+        function showResults(results) {
+            document.getElementById('reactions-table').innerHTML = '';
+            document.getElementById('gpf-table').innerHTML = '';
+            document.getElementById('maxima-values').innerHTML = '';
+
+            const residuals = results.gpf_balance?.residuals || [];
+            let html = '<table class="data-table"><thead><tr><th>Node</th><th>DOF</th><th>Residual</th></tr></thead><tbody>';
+            for (let i = 0; i < residuals.length; i += 3) {
+                const node = i / 3;
+                html += `<tr><td>${node}</td><td>u</td><td>${residuals[i].toExponential(2)}</td></tr>`;
+                html += `<tr><td>${node}</td><td>v</td><td>${residuals[i+1].toExponential(2)}</td></tr>`;
+                html += `<tr><td>${node}</td><td>rz</td><td>${residuals[i+2].toExponential(2)}</td></tr>`;
+            }
+            html += '</tbody></table>';
+            document.getElementById('reactions-table').innerHTML = html;
+
+            const gpfDiv = document.getElementById('gpf-table');
+            if (results.gpf_balance) {
+                const maxResidual = Math.max(...results.gpf_balance.residuals.map(Math.abs));
+                const tolerance = results.gpf_balance.tolerance;
+                gpfDiv.innerHTML = `<p>Max residual: ${maxResidual.toExponential(4)}</p><p>Tolerance: ${tolerance.toExponential(4)}</p><p>Status: ${maxResidual <= tolerance ? 'PASS' : 'FAIL'}</p>`;
+            }
+
+            const maxima = results.maxima;
+            if (maxima) {
+                const m = maxima;
+                document.getElementById('maxima-values').innerHTML = `
+                    <table class="data-table">
+                        <tr><th>Quantity</th><th>Value</th><th>Location</th></tr>
+                        <tr><td>Deflection (max)</td><td>${m.deflection.value.toExponential(4)}</td><td>Node ${m.deflection.node_id}</td></tr>
+                        <tr><td>Moment (max)</td><td>${m.moment.value.toExponential(4)}</td><td>Element ${m.moment.element_id}</td></tr>
+                        <tr><td>Shear (max)</td><td>${m.shear.value.toExponential(4)}</td><td>Element ${m.shear.element_id}</td></tr>
+                        <tr><td>Axial (max)</td><td>${m.axial.value.toExponential(4)}</td><td>Element ${m.axial.element_id}</td></tr>
+                        <tr><td>Stress (max)</td><td>${m.stress.value.toExponential(4)}</td><td>Element ${m.stress.element_id}</td></tr>
+                    </table>
+                `;
+            }
+
+            renderDiagrams(results.diagrams);
+        }
+
+        async function renderDiagrams(diagrams) {
+            const types = ['axial', 'shear', 'moment'];
+            const containers = [document.getElementById('axial-diagrams'), document.getElementById('shear-diagrams'), document.getElementById('moment-diagrams')];
+            const typeNames = ['Axial Force', 'Shear Force', 'Bending Moment'];
+
+            for (let t = 0; t < types.length; t++) {
+                const type = types[t];
+                const container = containers[t];
+                container.innerHTML = '';
+                for (const diagram of diagrams) {
+                    const elementId = diagram.element_id;
+                    const resp = await fetch(`${API_BASE}/diagram/${currentModelId}/${elementId}/${type}`);
+                    if (resp.ok) {
+                        const blob = await resp.blob();
+                        const url = URL.createObjectURL(blob);
+                        const div = document.createElement('div');
+                        div.className = 'diagram';
+                        div.innerHTML = `<strong>Element ${elementId} - ${typeNames[t]}</strong><br><img src="${url}" style="max-width: 100%; border: 1px solid #ddd;">`;
+                        container.appendChild(div);
+                    }
+                }
+            }
+        }
+
+        function handleCanvasClick(e) {
+            const canvas = document.getElementById('canvas');
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            // Convert screen to world coordinates
+            const scaleX = CANVAS_MAX_X - CANVAS_MIN_X;
+            const scaleY = CANVAS_MAX_Y - CANVAS_MIN_Y;
+            const worldX = CANVAS_MIN_X + (x / canvas.width) * scaleX;
+            const worldY = CANVAS_MAX_Y - (y / canvas.height) * scaleY;
+
+            if (clickMode === 'add-node') {
+                // Snap to grid
+                const snappedX = Math.round(worldX);
+                const snappedY = Math.round(worldY);
+                document.getElementById('snap-coords').textContent = `Snap: (${snappedX}, ${snappedY})`;
+                setTimeout(() => document.getElementById('snap-coords').textContent = '', 1000);
+
+                const newNode = { id: nodes.length, x: snappedX, y: snappedY };
+                nodes.push(newNode);
+                updateModelTree();
+                drawCanvas();
+                saveBtnEnabled();
+                clickMode = 'select';
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                document.querySelector('[data-mode="select"]').classList.add('active');
+                updateModeLabel();
+            } else if (clickMode === 'add-element') {
+                // Find nearest node
+                const nearest = findNearestNode(worldX, worldY, 20 / SCALE);
+                if (nearest) {
+                    if (!addElementState) {
+                        addElementState = { nodeId: nearest.id, x: nearest.x, y: nearest.y, nodeIdStr: nearest.idStr };
+                        document.getElementById('help-text').textContent = `First node: ${nearest.id}. Click second node.`;
+                    } else {
+                        const elem = {
+                            id: elements.length,
+                            node_i: addElementState.nodeId,
+                            node_j: nearest.id,
+                            material_id: 0,
+                            A: 1.0,
+                            Iz: 1.0
+                        };
+                        elements.push(elem);
+                        addElementState = null;
+                        updateModelTree();
+                        drawCanvas();
+                        saveBtnEnabled();
+                        clickMode = 'select';
+                        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                        document.querySelector('[data-mode="select"]').classList.add('active');
+                        updateModeLabel();
+                        document.getElementById('help-text').textContent = clickMode === 'select' ? 'Click node to select' : '';
+                    }
+                }
+            } else if (clickMode === 'add-bc' || clickMode === 'add-load') {
+                const nearest = findNearestNode(worldX, worldY, 20 / SCALE);
+                if (nearest) {
+                    document.getElementById(clickMode === 'add-bc' ? 'bc-node-id' : 'load-node-id').value = nearest.id;
+                    toggleModal(clickMode === 'add-bc' ? 'bc-modal' : 'load-modal', true);
+                }
+            } else {
+                // Select mode
+                const nearest = findNearestNode(worldX, worldY, 20 / SCALE);
+                if (nearest) {
+                    selectNode(nearest.id);
+                }
+            }
+        }
+
+        function findNearestNode(worldX, worldY, maxDist) {
+            let nearest = null;
+            let minDist = maxDist;
+            for (const node of nodes) {
+                const dist = Math.sqrt((node.x - worldX) ** 2 + (node.y - worldY) ** 2);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = node;
+                }
+            }
+            return nearest;
+        }
+
+        function selectNode(id) {
+            selectedNodeId = id;
+            document.getElementById('bc-node-id').value = id;
+            document.getElementById('load-node-id').value = id;
+            updateModelTree();
+        }
+
+        function toggleModal(id, show) {
+            const modal = document.getElementById(id);
+            if (show) {
+                modal.classList.add('active');
+            } else {
+                modal.classList.remove('active');
+            }
+            if (show && clickMode === 'add-bc') {
+                clickMode = 'select';
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                document.querySelector('[data-mode="select"]').classList.add('active');
+                updateModeLabel();
+            }
+        }
+
+        function saveBc() {
+            const nodeId = parseInt(document.getElementById('bc-node-id').value);
+            const dof = document.getElementById('bc-dof').value;
+            const value = parseFloat(document.getElementById('bc-value').value);
+
+            bcs.push({ node_id: nodeId, dof, value });
+            updateModelTree();
+            drawCanvas();
+            toggleModal('bc-modal', false);
+        }
+
+        function saveLoad() {
+            const nodeId = parseInt(document.getElementById('load-node-id').value);
+            const Fx = parseFloat(document.getElementById('load-fx').value) || 0;
+            const Fy = parseFloat(document.getElementById('load-fy').value) || 0;
+            const Mz = parseFloat(document.getElementById('load-mz').value) || 0;
+
+            nodalLoads.push({ node_id: nodeId, Fx, Fy, Mz });
+            updateModelTree();
+            drawCanvas();
+            toggleModal('load-modal', false);
+        }
+
+        function saveModel() {
+            const model = buildModel();
             const jsonStr = JSON.stringify(model, null, 2);
             const blob = new Blob([jsonStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -581,8 +569,8 @@
                 elements = model.elements || [];
                 bcs = model.bcs || [];
                 nodalLoads = model.nodal_loads || [];
+                addElementState = null;
 
-                // POST to server
                 const resp = await fetch(`${API_BASE}/model`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -590,116 +578,137 @@
                 });
 
                 if (resp.ok) {
-                    const data = await resp.json();
-                    currentModelId = data.model_id;
-                    clickState = null;
-                    updateModelTree();
-                    drawCanvas();
-                    saveBtnEnabled();
-                    document.getElementById('status-bar').textContent = 'Model loaded';
-                } else {
-                    throw new Error(`Server returned ${resp.status}`);
+                    currentModelId = (await resp.json()).model_id;
                 }
+                updateModelTree();
+                drawCanvas();
+                saveBtnEnabled();
             } catch (err) {
-                alert(`Failed to load model: ${err.message}`);
+                alert(`Failed to load: ${err.message}`);
             }
+        }
+
+        function saveBtnEnabled() {
+            document.getElementById('save-btn').disabled = nodes.length === 0;
+            document.getElementById('solve-btn').disabled = nodes.length === 0;
         }
 
         function updateModelTree() {
             const tree = document.getElementById('model-tree');
-            let html = '<div class="tree-node expanded"><span class="toggle">▼</span>Nodes</div><div style="padding-left: 20px;">';
+            let html = '<div class="tree-node expanded"><span class="toggle">▼</span>Nodes</div><div class="tree-content">';
             for (const node of nodes) {
-                html += `<div class="tree-node" data-type="node" data-id="${node.id}" data-node-x="${node.x}" data-node-y="${node.y}">Node ${node.id}: (${node.x.toFixed(1)}, ${node.y.toFixed(1)})</div>`;
+                let prefix = '';
+                const nodeBCs = bcs.filter(b => b.node_id === node.id);
+                const nodeLoads = nodalLoads.filter(l => l.node_id === node.id);
+                if (nodeBCs.length > 0) prefix += '<span class="bc-icon" title="BCs"></span>';
+                if (nodeLoads.length > 0) prefix += '<span class="load-icon" title="Loads"></span>';
+                html += `<div class="tree-node" data-type="node" data-id="${node.id}">${prefix}Node ${node.id}: (${node.x}, ${node.y})</div>`;
             }
             html += '</div>';
 
-            html += '<div class="tree-node"><span class="toggle">▶</span>Elements</div><div style="padding-left: 20px;">';
+            html += '<div class="tree-node"><span class="toggle">▶</span>Elements</div><div class="tree-content">';
             for (const elem of elements) {
                 html += `<div class="tree-node">Element ${elem.id}: Node ${elem.node_i} -> ${elem.node_j}</div>`;
             }
             html += '</div>';
 
-            html += '<div class="tree-node"><span class="toggle">▶</span>BCs</div><div style="padding-left: 20px;">';
+            html += '<div class="tree-node"><span class="toggle">▶</span>BCs</div><div class="tree-content">';
             for (const bc of bcs) {
                 html += `<div class="tree-node">Node ${bc.node_id}, ${bc.dof} = ${bc.value}</div>`;
             }
             html += '</div>';
 
-            html += '<div class="tree-node"><span class="toggle">▶</span>Loads</div><div style="padding-left: 20px;">';
+            html += '<div class="tree-node"><span class="toggle">▶</span>Loads</div><div class="tree-content">';
             for (const load of nodalLoads) {
-                const fx = load.Fx || 0;
-                const fy = load.Fy || 0;
-                const mz = load.Mz || 0;
-                html += `<div class="tree-node">Node ${load.node_id}: Fx=${fx}, Fy=${fy}, Mz=${mz}</div>`;
+                html += `<div class="tree-node">Node ${load.node_id}: Fx=${load.Fx}, Fy=${load.Fy}, Mz=${load.Mz}</div>`;
             }
             html += '</div>';
 
             tree.innerHTML = html;
 
-            // Add toggle handlers
             tree.querySelectorAll('.tree-node > .toggle').forEach(toggle => {
                 toggle.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const parent = toggle.parentElement;
                     parent.classList.toggle('expanded');
-                    parent.querySelector(':scope > div').style.display = parent.classList.contains('expanded') ? 'block' : 'none';
+                    parent.querySelector(':scope > .tree-content').style.display = parent.classList.contains('expanded') ? 'block' : 'none';
                 });
             });
 
-            // Add click handlers for nodes
             tree.querySelectorAll('.tree-node[data-type="node"]').forEach(nodeEl => {
                 nodeEl.addEventListener('click', (e) => {
                     if (e.target !== e.currentTarget) return;
-                    const id = nodeEl.dataset.id;
-                    selectNode(parseInt(id), parseFloat(nodeEl.dataset.nodeX), parseFloat(nodeEl.dataset.nodeY));
+                    selectNode(parseInt(nodeEl.dataset.id));
                 });
             });
-        }
-
-        function saveBtnEnabled() {
-            const saveBtn = document.getElementById('save-btn');
-            const solveBtn = document.getElementById('solve-btn');
-            saveBtn.disabled = nodes.length === 0;
-            solveBtn.disabled = nodes.length === 0;
         }
 
         function drawCanvas() {
             const canvas = document.getElementById('canvas');
             const ctx = canvas.getContext('2d');
-            const rect = canvas.parentElement.getBoundingClientRect();
-            canvas.width = rect.width;
-            canvas.height = rect.height - 40;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Clear
-            ctx.fillStyle = '#fff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            if (nodes.length === 0) {
-                ctx.fillStyle = '#999';
-                ctx.font = '16px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('Click on canvas to place nodes', canvas.width / 2, canvas.height / 2);
-                return;
-            }
-
-            // Calculate scale and offset
-            let minX = Math.min(...nodes.map(n => n.x), 0);
-            let maxX = Math.max(...nodes.map(n => n.x), 100);
-            let minY = Math.min(...nodes.map(n => n.y), 0);
-            let maxY = Math.max(...nodes.map(n => n.y), 100);
-
-            const padding = 50;
-            const scale = Math.min(
-                (canvas.width - 2 * padding) / (maxX - minX || 1),
-                (canvas.height - 2 * padding) / (maxY - minY || 1)
-            );
-
-            const offsetX = padding + (canvas.width - 2 * padding) / 2 - (minX + maxX) / 2 * scale;
-            const offsetY = canvas.height - padding - (minY + maxY) / 2 * scale;
+            // Calculate scale factors
+            const scaleX = (CANVAS_MAX_X - CANVAS_MIN_X) / canvas.width;
+            const scaleY = (CANVAS_MAX_Y - CANVAS_MIN_Y) / canvas.height;
 
             function toScreen(x, y) {
-                return { x: x * scale + offsetX, y: -y * scale + offsetY };
+                return { x: (x - CANVAS_MIN_X) / scaleX, y: canvas.height - (y - CANVAS_MIN_Y) / scaleY };
             }
+
+            // Draw grid
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1;
+
+            // Major grid every 12 inches
+            for (let x = CANVAS_MIN_X; x <= CANVAS_MAX_X; x += GRID_MAJOR) {
+                const p1 = toScreen(x, CANVAS_MIN_Y);
+                const p2 = toScreen(x, CANVAS_MAX_Y);
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+                ctx.fillStyle = '#999';
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(x, p1.x, p1.y + 15);
+            }
+
+            for (let y = CANVAS_MIN_Y; y <= CANVAS_MAX_Y; y += GRID_MAJOR) {
+                const p1 = toScreen(CANVAS_MIN_X, y);
+                const p2 = toScreen(CANVAS_MAX_X, y);
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+                ctx.fillStyle = '#999';
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(y, p1.x - 5, p1.y + 4);
+            }
+
+            // Minor grid every 1 inch
+            ctx.strokeStyle = '#f0f0f0';
+            for (let x = CANVAS_MIN_X; x <= CANVAS_MAX_X; x += GRID_MINOR) {
+                if (x % GRID_MAJOR === 0) continue;
+                const p1 = toScreen(x, CANVAS_MIN_Y);
+                const p2 = toScreen(x, CANVAS_MAX_Y);
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+            }
+            for (let y = CANVAS_MIN_Y; y <= CANVAS_MAX_Y; y += GRID_MINOR) {
+                if (y % GRID_MAJOR === 0) continue;
+                const p1 = toScreen(CANVAS_MIN_X, y);
+                const p2 = toScreen(CANVAS_MAX_X, y);
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+            }
+
+            if (nodes.length === 0) return;
 
             // Draw elements
             ctx.strokeStyle = '#3498db';
@@ -714,7 +723,6 @@
                 ctx.lineTo(p2.x, p2.y);
                 ctx.stroke();
 
-                // Draw node markers at ends
                 ctx.fillStyle = '#2980b9';
                 ctx.beginPath();
                 ctx.arc(p1.x, p1.y, 6, 0, Math.PI * 2);
@@ -723,13 +731,12 @@
                 ctx.arc(p2.x, p2.y, 6, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Node labels
                 ctx.fillStyle = '#000';
                 ctx.font = '12px sans-serif';
                 ctx.textAlign = 'right';
-                ctx.fillText(`Node ${n1.id}`, p1.x - 10, p1.y - 5);
+                ctx.fillText(`N${n1.id}`, p1.x - 10, p1.y - 5);
                 ctx.textAlign = 'left';
-                ctx.fillText(`Node ${n2.id}`, p2.x + 10, p2.y - 5);
+                ctx.fillText(`N${n2.id}`, p2.x + 10, p2.y - 5);
             }
 
             // Draw node IDs
@@ -740,7 +747,146 @@
                 ctx.textAlign = 'center';
                 ctx.fillText(node.id, p.x, p.y + 20);
             }
+
+            // Draw BCs
+            for (const bc of bcs) {
+                const node = nodes[bc.node_id];
+                if (!node) continue;
+                const p = toScreen(node.x, node.y);
+
+                if (bc.dof === 'u' && bc.dof === 'v' && bc.dof === 'rz') {
+                    // Fixed support - triangle with hatching
+                    drawFixedSupport(ctx, p.x, p.y + 15);
+                } else if (bc.dof === 'u' && bc.dof === 'v') {
+                    // Pinned - solid triangle
+                    drawPinnedSupport(ctx, p.x, p.y + 15);
+                } else if (bc.dof === 'v') {
+                    // Roller - triangle with circles
+                    drawRollerSupport(ctx, p.x, p.y + 15);
+                }
+            }
+
+            // Draw loads
+            for (const load of nodalLoads) {
+                if ((load.Fx || 0) !== 0 || (load.Fy || 0) !== 0) {
+                    const node = nodes[load.node_id];
+                    if (!node) continue;
+                    const p = toScreen(node.x, node.y);
+                    drawLoadArrow(ctx, p.x, p.y, load.Fx || 0, load.Fy || 0);
+                }
+            }
+
+            // Highlight selected node
+            if (selectedNodeId !== null) {
+                const node = nodes.find(n => n.id === selectedNodeId);
+                if (node) {
+                    const p = toScreen(node.x, node.y);
+                    ctx.strokeStyle = '#e74c3c';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+
+            // Highlight first node for element creation
+            if (addElementState) {
+                const node = nodes.find(n => n.id === addElementState.nodeId);
+                if (node) {
+                    const p = toScreen(node.x, node.y);
+                    ctx.strokeStyle = '#f39c12';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 12, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
         }
+
+        function drawFixedSupport(ctx, x, y) {
+            ctx.fillStyle = '#555';
+            ctx.beginPath();
+            ctx.moveTo(x - 15, y);
+            ctx.lineTo(x + 15, y);
+            ctx.lineTo(x, y - 10);
+            ctx.closePath();
+            ctx.fill();
+
+            // Hatching
+            ctx.strokeStyle = '#555';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 10; i++) {
+                ctx.beginPath();
+                ctx.moveTo(x - 15 + i * 3, y + 5);
+                ctx.lineTo(x - 15 + i * 3 + 10, y - 2);
+                ctx.stroke();
+            }
+        }
+
+        function drawPinnedSupport(ctx, x, y) {
+            ctx.fillStyle = '#555';
+            ctx.beginPath();
+            ctx.moveTo(x - 10, y);
+            ctx.lineTo(x + 10, y);
+            ctx.lineTo(x, y - 12);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawRollerSupport(ctx, x, y) {
+            ctx.fillStyle = '#555';
+            ctx.beginPath();
+            ctx.moveTo(x - 12, y);
+            ctx.lineTo(x + 12, y);
+            ctx.lineTo(x, y - 10);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#777';
+            ctx.beginPath();
+            ctx.arc(x - 8, y + 3, 3, 0, Math.PI * 2);
+            ctx.arc(x + 8, y + 3, 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawLoadArrow(ctx, x, y, fx, fy) {
+            const maxMag = Math.max(Math.abs(fx), Math.abs(fy));
+            if (maxMag === 0) return;
+            const scale = 0.1;
+            const dx = fx * scale;
+            const dy = fy * scale;
+            const mag = Math.sqrt(dx * dx + dy * dy);
+            if (mag < 5) return;
+
+            const fromX = x;
+            const fromY = y;
+            const toX = x + dx;
+            const toY = y + dy;
+
+            ctx.strokeStyle = '#e74c3c';
+            ctx.lineWidth = 2;
+            ctx.fillStyle = '#e74c3c';
+
+            // arrowhead
+            const angle = Math.atan2(toY - fromY, toX - fromX);
+            const headLen = 10;
+            const halfHead = 0.5;
+
+            ctx.beginPath();
+            ctx.moveTo(fromX, fromY);
+            ctx.lineTo(toX, toY);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(toX, toY);
+            ctx.lineTo(toX - headLen * Math.cos(angle - halfHead), toY - headLen * Math.sin(angle - halfHead));
+            ctx.lineTo(toX - headLen * Math.cos(angle + halfHead), toY - headLen * Math.sin(angle + halfHead));
+            ctx.lineTo(toX, toY);
+            ctx.fill();
+        }
+
+        // Initial draw
+        drawCanvas();
     </script>
 </body>
 </html>
