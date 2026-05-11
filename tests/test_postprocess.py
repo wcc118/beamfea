@@ -338,3 +338,158 @@ def test_element_node_contributions_v1():
     # At tip (node 1), element end force Fy = -1000 (equal and opposite)
     assert np.isclose(c['contrib_j']['Fy'], -1000.0, atol=1e-6)
     assert np.isclose(c['contrib_j']['Mz'], 0.0, atol=1e-3)
+
+
+
+def _make_release_model():
+    """Return a model for the release condensation test.
+
+    Triangular truss-frame: 3 nodes, 2 elements.
+    - N0(0,0) pinned(u,v)
+    - N1(10,0) pinned(u,v)
+    - N2(5,10) free — centered apex (symmetric geometry)
+    - E0: N0→N2, no releases (fixed-fixed)
+    - E1: N1→N2, release_j_Mz=True (pin at N2)
+    - Load at N2: Fx=0, Fy=-1000 (vertical downward)
+    - No distributed loads
+
+    With symmetric geometry (E0 and E1 at equal but opposite angles),
+    vertical load splits equally between elements. E1 becomes a two-force
+    member (pin at j, no distributed load, N1 rz free).
+    """
+    return {
+        "nodes": [
+            {"id": 0, "x": 0.0, "y": 0.0},
+            {"id": 1, "x": 10.0, "y": 0.0},
+            {"id": 2, "x": 5.0, "y": 10.0},
+        ],
+        "materials": [{"id": 0, "E": 10300000.0, "nu": 0.33}],
+        "elements": [
+            {
+                "id": 0,
+                "node_i": 0,
+                "node_j": 2,
+                "material_id": 0,
+                "A": 1.0,
+                "Iz": 1.0,
+                "release_i_Mz": False,
+                "release_j_Mz": False,
+            },
+            {
+                "id": 1,
+                "node_i": 1,
+                "node_j": 2,
+                "material_id": 0,
+                "A": 1.0,
+                "Iz": 1.0,
+                "release_i_Mz": False,
+                "release_j_Mz": True,
+            },
+        ],
+        "bcs": [
+            {"node_id": 0, "dof": "u", "value": 0.0},
+            {"node_id": 0, "dof": "v", "value": 0.0},
+            {"node_id": 1, "dof": "u", "value": 0.0},
+            {"node_id": 1, "dof": "v", "value": 0.0},
+        ],
+        "nodal_loads": [{"node_id": 2, "Fx": 0.0, "Fy": -1000.0, "Mz": 0.0}],
+        "element_loads": [],
+    }
+
+
+def test_release_condensation_colinear_reaction():
+    """E1 pinned at j-end with no distributed load: reaction at N1 aligns with E1 axis.
+
+    Triangular frame: N0(0,0) pinned, N1(10,0) pinned, N2(5,10) free.
+    E0: N0→N2 (63.43 deg), no releases.
+    E1: N1→N2 (116.57 deg), release_j_Mz=True (pin at N2).
+    Vertical load: Fy=-1000 at N2.
+
+    Freebody equilibrium at N1: N1 has rz free (no external moment),
+    N1 is only connected by E1. E1 carries no external distributed load.
+    E1 is a two-force member: its end forces must be colinear with the
+    member axis. Therefore R1 must align with N1→N2 direction (116.57 deg).
+
+    Independent verifications:
+    1. |R1y/R1x - slope_E1| < atol — N1 reaction colinear with E1 axis
+    2. M_1j = 0 — pin release at j-end
+    3. M_1i = 0 — N1 rz free, only E1 connects ⇒ two-force member
+    4. V_1i = V_1j = 0 — E1 carries only axial force
+    5. Global equilibrium: sum Fx ≈ 0, sum Fy ≈ 1000, sum M ≈ 0
+
+    References: Cook 4th ed., §2.7 (end condensation for pinned joints);
+    McGuire-Gallagher-Ziemer 2nd ed., Ch. 7 (end releases).
+    """
+    model = _make_release_model()
+    nodes = model["nodes"]
+    elements = model["elements"]
+    materials = model["materials"]
+    bcs = model["bcs"]
+    nodal_loads = model["nodal_loads"]
+
+    d_full, _, _ = solve_linear_static(
+        nodes, elements, materials, bcs, nodal_loads, []
+    )
+
+    # === 1. Reaction at N1 must be colinear with E1 axis ===
+    R = compute_reactions(
+        nodes, elements, materials, bcs, nodal_loads, d_full
+    )
+    R1x = R[3 * 1]
+    R1y = R[3 * 1 + 1]
+
+    # E1 direction from N1(10,0) to N2(5,10)
+    E1_dx = nodes[2]["x"] - nodes[1]["x"]
+    E1_dy = nodes[2]["y"] - nodes[1]["y"]
+    # Unit direction
+    u_vec = np.array([E1_dx, E1_dy])
+    u_vec /= np.linalg.norm(u_vec)
+    # Reaction vector
+    r_vec = np.array([R1x, R1y])
+    mag_r = np.linalg.norm(r_vec)
+    if mag_r > 1e-12:
+        angle_deg = np.degrees(np.arccos(np.clip(np.abs(np.dot(r_vec / mag_r, u_vec)), -1.0, 1.0)))
+    else:
+        angle_deg = 0.0
+    assert angle_deg < 0.001, (
+        f"Reaction at N1 must be colinear with E1 axis. "
+        f"Angle between R1 and E1 axis: {angle_deg:.6f} deg"
+    )
+
+    # === 2. E1 j-end moment at N2 must be zero (pin release) ===
+    end_forces = compute_element_end_forces(
+        nodes, elements, materials, d_full, []
+    )
+    e1_forces = [ef for ef in end_forces if ef["element_id"] == 1][0][
+        "forces_local"
+    ]
+    N_i, V_i, M_i, N_j, V_j, M_j = e1_forces
+    assert M_j == 0.0 or np.isclose(M_j, 0.0, atol=1e-6), (
+        f"Released end M_j must be zero, got {M_j}"
+    )
+
+    # === 3. E1 i-end at N1: M_i and V_i must be zero ===
+    assert np.isclose(M_i, 0.0, atol=1e-6), (
+        f"E1 i-end moment must be zero (two-force member), got {M_i}"
+    )
+    assert np.isclose(V_i, 0.0, atol=1e-6), (
+        f"E1 i-end shear must be zero (two-force member), got {V_i}"
+    )
+    assert np.isclose(V_j, 0.0, atol=1e-6), (
+        f"E1 j-end shear must be zero (two-force member), got {V_j}"
+    )
+
+    # === 4. Global equilibrium ===
+    from beamfea.assembly import assemble_global_stiffness, assemble_nodal_loads
+    K = assemble_global_stiffness(nodes, elements, materials)
+    F = assemble_nodal_loads(nodes, nodal_loads, elements, [], materials)
+
+    # Sum of reactions balances applied loads
+    Fx_sum = sum(R[3 * i] for i in range(len(nodes)))
+    Fy_sum = sum(R[3 * i + 1] for i in range(len(nodes)))
+    assert np.isclose(Fx_sum, 0.0, atol=1e-6), (
+        f"Global ∑Fx = {Fx_sum}, expected 0"
+    )
+    assert np.isclose(Fy_sum, 1000.0, atol=1e-6), (
+        f"Global ∑Fy = {Fy_sum}, expected +1000 to balance -1000 load"
+    )

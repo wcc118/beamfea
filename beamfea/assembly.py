@@ -21,7 +21,29 @@ from beamfea.element import (
     condense_rotational_dof,
     element_stiffness_global,
     element_stiffness_local,
+    transformation_matrix,
 )
+
+
+def _transform_local_to_global(K_local: np.ndarray, theta: float) -> np.ndarray:
+    """Transform a (possibly condensed) local stiffness to global coords.
+
+    K_global = T^T * K_local * T
+
+    When end releases are present, K_local is the condensed 6x6 matrix
+    from condense_rotational_dof, not the full unreleased matrix.
+    The rotation matrix T is standard 6x6 block-diagonal of two 3x3
+    rotation blocks.
+
+    Args:
+        K_local: 6x6 local stiffness (condensed if releases present)
+        theta: angle from global X to local x_hat (radians)
+
+    Returns:
+        6x6 global stiffness matrix
+    """
+    T = transformation_matrix(theta)
+    return T.T @ K_local @ T
 
 
 def global_dof_indices(node_i: int, node_j: int) -> list[int]:
@@ -96,11 +118,15 @@ def assemble_global_stiffness(
         # Compute local stiffness matrix
         K_local = element_stiffness_local(E, A, Iz, L)
 
-        # Apply end releases
-        K_local = condense_rotational_dof(K_local, elem["release_i_Mz"], elem["release_j_Mz"])
+        # Apply end releases (static condensation in local coords)
+        if elem.get("release_i_Mz") or elem.get("release_j_Mz"):
+            K_local = condense_rotational_dof(K_local, elem["release_i_Mz"], elem["release_j_Mz"])
 
         # Transform to global coordinates
-        K_global = element_stiffness_global(E, A, Iz, L, theta)
+        if elem.get("release_i_Mz") or elem.get("release_j_Mz"):
+            K_global = _transform_local_to_global(K_local, theta)
+        else:
+            K_global = element_stiffness_global(E, A, Iz, L, theta)
 
         # Get global DOF indices
         gdof = global_dof_indices(node_i, node_j)
@@ -157,7 +183,7 @@ def assemble_nodal_loads(
         F[gdof_v] += load.get("Fy", 0.0)
         F[gdof_rz] += load.get("Mz", 0.0)
 
-    # Add element loads (converted to nodal forces)
+    # Add element loads (converted to condensed nodal forces)
     if element_loads:
         # Build element and material maps
         element_map = {e["id"]: e for e in elements} if elements else {}
@@ -187,18 +213,40 @@ def assemble_nodal_loads(
             w_axial = load.get("w_axial", 0.0)
             w_transverse = load.get("w_transverse", 0.0)
 
-            # Fixed-end forces in local coordinates
-            f_local = np.zeros(6)
+            # Full fixed-end forces in local coordinates (for fully-fixed element)
+            f_fe_full = np.zeros(6)
             if w_axial != 0:
-                f_local[0] = w_axial * L / 2
-                f_local[3] = w_axial * L / 2
+                f_fe_full[0] = w_axial * L / 2
+                f_fe_full[3] = w_axial * L / 2
             if w_transverse != 0:
-                f_local[1] = w_transverse * L / 2
-                f_local[2] = w_transverse * L**2 / 12
-                f_local[4] = w_transverse * L / 2
-                f_local[5] = -w_transverse * L**2 / 12
+                f_fe_full[1] = w_transverse * L / 2
+                f_fe_full[2] = w_transverse * L**2 / 12
+                f_fe_full[4] = w_transverse * L / 2
+                f_fe_full[5] = -w_transverse * L**2 / 12
 
-            # Transform to global
+            # Build K_local used by condense_rotational_dof so force condensation
+            # is consistent with the stiffness condensation.
+            K_local = element_stiffness_local(E, A=elem["A"], Iz=elem["Iz"], L=L)
+
+            # If element has releases, condense fixed-end forces
+            # to match the condensed stiffness matrix.
+            # Pairs exactly with condense_rotational_dof() DOF ordering.
+            release_i = elem.get("release_i_Mz", False)
+            release_j = elem.get("release_j_Mz", False)
+            f_cond = f_fe_full.copy()
+
+            release_pairs = []
+            if release_i:
+                release_pairs.append((2, [0, 1, 3, 4, 5]))  # condense θz_i
+            if release_j:
+                release_pairs.append((5, [0, 1, 2, 3, 4]))  # condense θz_j
+
+            for release_dof, keep in release_pairs:
+                k_vec = K_local[np.ix_(keep, [release_dof])].ravel()
+                k_scalar = K_local[release_dof, release_dof]
+                f_cond[np.array(keep)] -= k_vec * f_fe_full[release_dof] / k_scalar
+
+            # Transform condensed nodal forces to global
             theta = np.arctan2(dy, dx)
             c, s = np.cos(theta), np.sin(theta)
             T = np.array([
@@ -209,7 +257,7 @@ def assemble_nodal_loads(
                 [0, 0, 0, -s, c, 0],
                 [0, 0, 0, 0, 0, 1],
             ])
-            f_global = T @ f_local
+            f_global = T @ f_cond
 
             # Apply to global DOFs
             gdof_i = 3 * node_i

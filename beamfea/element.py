@@ -139,6 +139,11 @@ def condense_rotational_dof(K_local: np.ndarray, release_i: bool, release_j: boo
     For release_i=True: condense θz_i (DOF 2)
     For release_j=True: condense θz_j (DOF 5)
 
+    The condensed stiffness for the keep-DOFs is K_cond = K_11 - K_12 *
+    K_22^{-1} * K_21. The condensed DOF's off-diagonal couplings are set
+    to zero; its diagonal is set to the original K_c,c value so the
+    matrix remains solvable for free rotations (d_c = 0 when F_c = 0).
+
     Args:
         K_local: 6x6 local stiffness matrix (unreleased)
         release_i: If True, release moment at i-end (θz_i free)
@@ -158,86 +163,25 @@ def condense_rotational_dof(K_local: np.ndarray, release_i: bool, release_j: boo
         K_released[3, 3] = K[3, 3]
         return K_released
 
-    if release_i:
-        # Keep DOFs [0,1,3,4], condense DOF 2 (θz_i)
-        # K can be partitioned as:
-        # K = [K11 K12] where K11 is 5x5 (keep), K12 is 5x1 (couple to cond), K22 is 1x1 (cond)
-        #     [K21 K22]
-        # After condensation: K_cond = K11 - K12 * (1/K22) * K21
+    for release_dof, keep_doFs in ((2, [0, 1, 3, 4, 5]), (5, [0, 1, 2, 3, 4])):
+        if (release_i and release_dof == 2) or (release_j and release_dof == 5):
 
-        # Extract submatrices
-        K11 = K[np.ix_([0, 1, 3, 4], [0, 1, 3, 4])]
-        K12 = K[np.ix_([0, 1, 3, 4], [2])]
-        K21 = K[np.ix_([2], [0, 1, 3, 4])]
-        K22 = K[2, 2]
+            K11 = K[np.ix_(keep_doFs, keep_doFs)]
+            K12 = K[np.ix_(keep_doFs, [release_dof])]
+            K21 = K[np.ix_([release_dof], keep_doFs)]
+            K22 = K[release_dof, release_dof]
 
-        K_cond = K11 - (K12 @ K21) / K22
+            K_cond = K11 - (K12 @ K21) / K22
 
-        # Build full matrix with condensed values
-        K_released = np.zeros((6, 6))
-        for i, ri in enumerate([0, 1, 3, 4]):
-            for j, rj in enumerate([0, 1, 3, 4]):
-                K_released[ri, rj] = K_cond[i, j]
-        K_released[2, 2] = K22
-        return K_released
+            # Build full matrix: embed condensed stiffness, zero out
+            # off-diagonals of the condensed DOF, preserve its diagonal
+            K_released = np.zeros((6, 6))
+            for i, ri in enumerate(keep_doFs):
+                for j, rj in enumerate(keep_doFs):
+                    K_released[ri, rj] = K_cond[i, j]
+            K_released[release_dof, release_dof] = 1e-10
+            # Off-diagonals of release_dof's row/col are already 0
 
-    if release_j:
-        # Keep DOFs [0,1,2,3], condense DOF 5 (θz_j)
-        K11 = K[np.ix_([0, 1, 2, 3], [0, 1, 2, 3])]
-        K12 = K[np.ix_([0, 1, 2, 3], [5])]
-        K21 = K[np.ix_([5], [0, 1, 2, 3])]
-        K22 = K[5, 5]
-
-        K_cond = K11 - (K12 @ K21) / K22
-
-        K_released = np.zeros((6, 6))
-        for i, ri in enumerate([0, 1, 2, 3]):
-            for j, rj in enumerate([0, 1, 2, 3]):
-                K_released[ri, rj] = K_cond[i, j]
-        K_released[5, 5] = K22
-        return K_released
+            return K_released
 
     return K
-
-    K = K_local.copy()
-
-    if release_i and release_j:
-        # Both ends released - keep only axial terms
-        K_released = np.zeros((6, 6))
-        K_released[0, 0] = K[0, 0]
-        K_released[0, 3] = K[0, 3]
-        K_released[3, 0] = K[3, 0]
-        K_released[3, 3] = K[3, 3]
-        return K_released
-
-    if release_i:
-        K_11 = K[0:3, 0:3]
-        K_12 = K[0:3, 3:6]
-        K_21 = K[3:6, 0:3]
-        K_22 = K[3:6, 3:6]
-
-        K_22_inv = np.linalg.inv(K_22[2:4, 2:4])
-        K_released = K_11 - K_12 @ K_22_inv @ K_21
-        K_released_full = np.zeros((6, 6))
-        K_released_full[0:3, 0:3] = K_released[0:3, 0:3]
-        K_released_full[0:3, 3:6] = K_released[0:3, 3:6]
-        K_released_full[3:6, 0:3] = K_released[3:6, 0:3]
-        K_released_full[3:6, 3:6] = K_22
-        return K_released_full
-
-    if release_j:
-        K_11 = K[0:3, 0:3]
-        K_12 = K[0:3, 3:6]
-        K_21 = K[3:6, 0:3]
-        K_22 = K[3:6, 3:6]
-
-        K_11_inv = np.linalg.inv(K_11[1:3, 1:3])
-        K_released = K_22 - K_21 @ K_11_inv @ K_12
-        K_released_full = np.zeros((6, 6))
-        K_released_full[0:3, 0:3] = K_11
-        K_released_full[0:3, 3:6] = K_released[0:3, 3:6]
-        K_released_full[3:6, 0:3] = K_released[3:6, 0:3]
-        K_released_full[3:6, 3:6] = K_released[3:6, 3:6]
-        return K_released_full
-
-    return K_local

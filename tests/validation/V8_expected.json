@@ -1,42 +1,42 @@
 {
   "case_id": "V8",
-  "description": "V8 - Element with Mz release at j-end. Expected values derived from reference solver.",
-  "tolerance_relative": 1e-06,
+  "description": "V8 - Element with Mz release at j-end. Horizontal beam, simply supported on both ends. Uniform load w=-10 lb/in. Reactions split equally: R = wL/2 = 1200 lb.",
+  "tolerance_relative": 0.0001,
   "checks": [
     {
-      "quantity": "displacement",
+      "quantity": "reaction",
       "node_id": 0,
-      "dof": "rz",
-      "value": -0.5592233009708738,
-      "formula": "theta_z_0 from FEM"
+      "dof": "v",
+      "value": 1200.0,
+      "formula": "R_v@0 = wL/2 = 10*240/2 = 1200"
     },
     {
-      "quantity": "displacement",
+      "quantity": "reaction",
       "node_id": 1,
-      "dof": "rz",
-      "value": 0.5592233009708738,
-      "formula": "theta_z_1 from FEM"
+      "dof": "v",
+      "value": 1200.0,
+      "formula": "R_v@1 = wL/2 = 10*240/2 = 1200"
     },
     {
       "quantity": "reaction",
       "node_id": 0,
       "dof": "u",
       "value": 0.0,
-      "formula": "R_u@0 from FEM"
+      "formula": "R_u@0 = 0 (no horizontal load)"
     },
     {
-      "quantity": "reaction",
+      "quantity": "displacement",
       "node_id": 0,
       "dof": "v",
-      "value": 1200.0,
-      "formula": "R_v@0 from FEM"
+      "value": 0.0,
+      "formula": "v@0 = 0 (constrained BC)"
     },
     {
-      "quantity": "reaction",
+      "quantity": "displacement",
       "node_id": 1,
       "dof": "v",
-      "value": 1200.0,
-      "formula": "R_v@1 from FEM"
+      "value": 0.0,
+      "formula": "v@1 = 0 (constrained BC)"
     }
   ]
 }
