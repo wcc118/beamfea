@@ -136,7 +136,7 @@
             <div class="tree-bottom" style="flex-wrap:wrap;gap:4px">
                 <button id="save-btn" disabled style="flex:1">Save</button>
                 <button id="load-btn" style="flex:1">Load</button>
-                <button id="theme-toggle" title="Toggle dark mode" style="flex:0 0 100%;font-size:13px">Dark mode</button>
+                <button id="theme-toggle" style="font-size:11px" title="Toggle light/dark mode">Dark</button>
             </div>
         </div>
         <div class="pane center">
@@ -159,7 +159,9 @@
                 <div class="overlay-bar" id="overlay-bar" style="display:none">
                     <label><input type="checkbox" id="chk-defl" checked> Deflected</label>
                     <label><input type="checkbox" id="chk-react" checked> Reactions</label>
-                    <label><input type="checkbox" id="chk-smd" checked> SMD</label>
+                    <label><input type="checkbox" id="chk-shear" checked> Shear</label>
+                    <label><input type="checkbox" id="chk-moment" checked> Moment</label>
+                    <label><input type="checkbox" id="chk-axial" checked> Axial</label>
                     <label><input type="checkbox" id="chk-maxima" checked> Maxima</label>
                     <span id="defl-scale-label" style="color:#666"></span>
                 </div>
@@ -346,7 +348,7 @@ function wire() {
     document.getElementById('node-delete').addEventListener('click', removeNode);
     document.getElementById('node-cancel').addEventListener('click', () => closeModal('node-modal'));
     /* overlay toggles redraw */
-    for (const id of ['chk-defl','chk-react','chk-smd','chk-maxima']) {
+    for (const id of ['chk-defl','chk-react','chk-shear','chk-moment','chk-axial','chk-maxima']) {
         document.getElementById(id).addEventListener('change', () => drawCanvas());
     }
 }
@@ -850,7 +852,9 @@ function drawCanvas(){
 
     const showDefl  = document.getElementById('chk-defl').checked;
     const showReact = document.getElementById('chk-react').checked;
-    const showSmd   = document.getElementById('chk-smd').checked;
+    const showShear = document.getElementById('chk-shear').checked;
+    const showMom   = document.getElementById('chk-moment').checked;
+    const showN     = document.getElementById('chk-axial').checked;
     const showMax   = document.getElementById('chk-maxima').checked;
 
     /* Deflected shape (Hermite cubics, client-side) */
@@ -915,10 +919,13 @@ function drawCanvas(){
     }
 
     /* SMD overlays (perpendicular to element, scaled) */
-    if(showSmd && R.diagrams){
+    const showAnySmd = showShear || showMom || showN;
+    if(showAnySmd && R.diagrams){
         const allVals=[];
-        for(const diag of R.diagrams) for(const st of diag.stations){allVals.push(Math.abs(st.V),Math.abs(st.M),Math.abs(st.N));}
-        const maxVal=Math.max(...allVals,1e-12);
+        if(showShear) for(const diag of R.diagrams) for(const st of diag.stations){allVals.push(Math.abs(st.V));}
+        if(showMom)   for(const diag of R.diagrams) for(const st of diag.stations){allVals.push(Math.abs(st.M));}
+        if(showN)     for(const diag of R.diagrams) for(const st of diag.stations){allVals.push(Math.abs(st.N));}
+        const maxVal=allVals.length ? Math.max(...allVals,1e-12) : 1e-12;
         const smdPxMax=60; // max perpendicular offset in pixels
         const smdScale=smdPxMax/maxVal;
 
@@ -934,7 +941,11 @@ function drawCanvas(){
             const tx=(pj.x-pi.x)/elen, ty=(pj.y-pi.y)/elen;
             const nx=-ty, ny=tx; // screen-space normal
 
-            for(const [key,color,label] of [['M','rgba(142,68,173,0.6)','M'],['V','rgba(41,128,185,0.5)','V'],['N','rgba(230,126,34,0.5)','N']]){
+            const drawKeys=[];
+            if(showShear) drawKeys.push(['V','rgba(41,128,185,0.5)','V']);
+            if(showMom)   drawKeys.push(['M','rgba(142,68,173,0.6)','M']);
+            if(showN)     drawKeys.push(['N','rgba(230,126,34,0.5)','N']);
+            for(const [key,color,label] of drawKeys){
                 ctx.save(); ctx.fillStyle=color; ctx.strokeStyle=color; ctx.lineWidth=1;
                 ctx.beginPath();
                 const pts=diag.stations;
