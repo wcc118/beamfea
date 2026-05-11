@@ -43,6 +43,10 @@
         .zoom-rect { position: absolute; border: 2px dashed #3498db; background: rgba(52,152,219,0.08); pointer-events: none; z-index: 4; }
         .overlay-bar label { cursor: pointer; display: flex; align-items: center; gap: 3px; }
         .overlay-bar input[type=checkbox] { margin: 0; }
+        #labels-btn { padding: 2px 8px; font-size: 0.7rem; cursor: pointer; background: rgba(255,255,255,0.9); border: 1px solid #ccc; border-radius: 3px; white-space: nowrap; }
+        #labels-btn:hover { background: #f0f0f0; }
+        #labels-dropdown.open { display: block; }
+        #labels-dropdown label { display: flex; align-items: center; gap: 4px; margin: 2px 0; }
         .status-bar { flex: 0 0 auto; padding: 4px 10px; background: #e9ecef; font-size: 0.8rem; display: flex; gap: 16px; }
         .status-bar .mode-label { font-weight: bold; color: #2980b9; }
         .status-bar .help-text { color: #555; }
@@ -125,6 +129,9 @@
         [data-theme="dark"] .field { color:var(--text-field); }
         [data-theme="dark"] .field label { color:var(--text-field); }
         [data-theme="dark"] .field input, [data-theme="dark"] .field select { background:var(--bg-field); color:var(--text-input); border-color:var(--border-input); }
+        [data-theme="dark"] #labels-dropdown { background: #1a2235; color: #cbd5e1; border: 1px solid #2a3a52; }
+        [data-theme="dark"] #labels-btn { background: #1a2235; color: #cbd5e1; border-color: #2a3a52; }
+        [data-theme="dark"] #labels-btn:hover { background: #243447; }
     </style>
 </head>
 <body>
@@ -164,6 +171,21 @@
                     <label><input type="checkbox" id="chk-axial" checked> Axial</label>
                     <label><input type="checkbox" id="chk-maxima" checked> Maxima</label>
                     <span id="defl-scale-label" style="color:#666"></span>
+                    <span style="position:relative;display:inline-block">
+                        <button id="labels-btn" title="Toggle labels">Labels ▾</button>
+                        <div id="labels-dropdown" hidden style="position:absolute;top:100%;right:0;margin-top:2px;background:rgba(255,255,255,0.96);border-radius:5px;box-shadow:0 2px 12px rgba(0,0,0,0.15);padding:10px 14px;font-size:0.8rem;z-index:10;min-width:160px">
+                            <div style="font-weight:600;font-size:0.75rem;color:#666;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.3px">Structural</div>
+                            <label style="display:flex;align-items:center;gap:4px;margin:2px 0"><input type="checkbox" id="lbl-nodes" checked> Node IDs</label>
+                            <label style="display:flex;align-items:center;gap:4px;margin:2px 0"><input type="checkbox" id="lbl-elems" checked> Element IDs</label>
+                            <label style="display:flex;align-items:center;gap:4px;margin:2px 0"><input type="checkbox" id="lbl-react"> Reaction values</label>
+                            <label style="display:flex;align-items:center;gap:4px;margin:2px 0"><input type="checkbox" id="lbl-loads"> Applied loads</label>
+                            <div style="font-weight:600;font-size:0.75rem;color:#666;margin:8px 0 5px;text-transform:uppercase;letter-spacing:0.3px">SMD Peaks</div>
+                            <label style="display:flex;align-items:center;gap:4px;margin:2px 0"><input type="checkbox" id="lbl-smd-v" checked> Shear peaks</label>
+                            <label style="display:flex;align-items:center;gap:4px;margin:2px 0"><input type="checkbox" id="lbl-smd-m" checked> Moment peaks</label>
+                            <label style="display:flex;align-items:center;gap:4px;margin:2px 0"><input type="checkbox" id="lbl-smd-n" checked> Axial peaks</label>
+                            <label style="display:flex;align-items:center;gap:4px;margin:2px 0"><input type="checkbox" id="lbl-max-flags" checked> Maxima flags</label>
+                        </div>
+                    </span>
                 </div>
             </div>
             <div class="status-bar" id="status-bar">
@@ -272,6 +294,8 @@ const API = '';
 let modelId = null;
 let nodes = [], elements = [], bcs = [], loads = [];
 let savedName = '';
+let showLblNodes = true, showLblElems = true, showLblReact = false, showLblLoads = false;
+let showLblSMDV = true, showLblSMDM = true, showLblSMDN = true, showLblMaxFlags = true;
 let mode = 'select';
 let selNodeId = null, elemFirst = null;
 let editBcIdx = null, editLoadIdx = null, editElemIdx = null, editNodeIdx = null;
@@ -351,6 +375,30 @@ function wire() {
     for (const id of ['chk-defl','chk-react','chk-shear','chk-moment','chk-axial','chk-maxima']) {
         document.getElementById(id).addEventListener('change', () => drawCanvas());
     }
+    /* label toggles update state + redraw */
+    document.getElementById('lbl-nodes').addEventListener('change', () => { showLblNodes = document.getElementById('lbl-nodes').checked; drawCanvas(); });
+    document.getElementById('lbl-elems').addEventListener('change', () => { showLblElems = document.getElementById('lbl-elems').checked; drawCanvas(); });
+    document.getElementById('lbl-react').addEventListener('change', () => { showLblReact = document.getElementById('lbl-react').checked; drawCanvas(); });
+    document.getElementById('lbl-loads').addEventListener('change', () => { showLblLoads = document.getElementById('lbl-loads').checked; drawCanvas(); });
+    document.getElementById('lbl-smd-v').addEventListener('change', () => { showLblSMDV = document.getElementById('lbl-smd-v').checked; drawCanvas(); });
+    document.getElementById('lbl-smd-m').addEventListener('change', () => { showLblSMDM = document.getElementById('lbl-smd-m').checked; drawCanvas(); });
+    document.getElementById('lbl-smd-n').addEventListener('change', () => { showLblSMDN = document.getElementById('lbl-smd-n').checked; drawCanvas(); });
+    document.getElementById('lbl-max-flags').addEventListener('change', () => { showLblMaxFlags = document.getElementById('lbl-max-flags').checked; drawCanvas(); });
+    /* Labels dropdown toggle + click-away close */
+    let labelsOpen = false;
+    const labelsBtn = document.getElementById('labels-btn');
+    const labelsDropdown = document.getElementById('labels-dropdown');
+    labelsBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        labelsOpen = !labelsOpen;
+        labelsDropdown.hidden = !labelsOpen;
+    });
+    document.addEventListener('click', e => {
+        if (labelsOpen && !labelsDropdown.contains(e.target) && e.target !== labelsBtn) {
+            labelsOpen = false;
+            labelsDropdown.hidden = true;
+        }
+    });
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -790,7 +838,7 @@ function drawCanvas(){
     ctx.strokeStyle='#bbb';ctx.lineWidth=1.5;
     if(vMinX<=0&&vMaxX>=0){const p=toScreen(0,0);ctx.beginPath();ctx.moveTo(p.x,0);ctx.lineTo(p.x,H);ctx.stroke();}
     if(vMinY<=0&&vMaxY>=0){const p=toScreen(0,0);ctx.beginPath();ctx.moveTo(0,p.y);ctx.lineTo(W,p.y);ctx.stroke();}
-    ctx.fillStyle='#999';ctx.font='10px sans-serif';
+    ctx.fillStyle='#999';ctx.font='12px sans-serif';
     ctx.textAlign='center';ctx.textBaseline='top';
     for(let gx=gx0;gx<=vMaxX;gx+=gs){const p=toScreen(gx,vMinY);if(p.x>30&&p.x<W-10)ctx.fillText(fmtGrid(gx),p.x,H-14);}
     ctx.textAlign='right';ctx.textBaseline='middle';
@@ -816,8 +864,10 @@ function drawCanvas(){
             }
         }
         /* element label at midspan */
-        ctx.save();ctx.fillStyle='#2471a3';ctx.font='9px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';
-        ctx.fillText('E'+el.id,(p1.x+p2.x)/2,(p1.y+p2.y)/2-6);ctx.restore();
+        if (showLblElems) {
+            ctx.save();ctx.fillStyle='#2471a3';ctx.font='bold 14px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';
+            ctx.fillText('E'+el.id,(p1.x+p2.x)/2,(p1.y+p2.y)/2-8);ctx.restore();
+        }
     }
     ctx.restore();
 
@@ -833,14 +883,16 @@ function drawCanvas(){
     }
 
     /* applied load arrows */
-    for(const ld of loads){const nd=nodes.find(n=>n.id===ld.node_id);if(!nd)continue;const p=toScreen(nd.x,nd.y);
-        if(ld.Fx||ld.Fy)drawForceArrow(ctx,p.x,p.y,ld.Fx,ld.Fy,'#c0392b','Applied');
-        if(ld.Mz)drawMomentArc(ctx,p.x,p.y,ld.Mz,'#8e44ad');
+    if(showLblLoads){
+        for(const ld of loads){const nd=nodes.find(n=>n.id===ld.node_id);if(!nd)continue;const p=toScreen(nd.x,nd.y);
+            if(ld.Fx||ld.Fy)drawForceArrow(ctx,p.x,p.y,ld.Fx,ld.Fy,'#c0392b','Applied');
+            if(ld.Mz)drawMomentArc(ctx,p.x,p.y,ld.Mz,'#8e44ad');
+        }
     }
 
     /* nodes */
     for(const n of nodes){const p=toScreen(n.x,n.y);ctx.fillStyle='#2c3e50';ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);ctx.fill();
-        ctx.fillStyle='#333';ctx.font='11px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText('N'+n.id,p.x,p.y-8);}
+        if(showLblNodes){ctx.fillStyle='#333';ctx.font='bold 14px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText('N'+n.id,p.x,p.y-10);}}
 
     /* selection ring */
     if(selNodeId!==null){const nd=nodes.find(n=>n.id===selNodeId);if(nd){const p=toScreen(nd.x,nd.y);ctx.strokeStyle='#e74c3c';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,10,0,Math.PI*2);ctx.stroke();}}
@@ -915,6 +967,13 @@ function drawCanvas(){
             const nd=nodes.find(n=>n.id===parseInt(nid));if(!nd)continue;const p=toScreen(nd.x,nd.y);
             if(Math.abs(rv.Fx)>1e-6||Math.abs(rv.Fy)>1e-6) drawForceArrow(ctx,p.x,p.y,rv.Fx,rv.Fy,'#27ae60','R');
             if(Math.abs(rv.Mz)>1e-6) drawMomentArc(ctx,p.x,p.y,rv.Mz,'#27ae60');
+            if(showLblReact && (Math.abs(rv.Fx)>1e-6||Math.abs(rv.Fy)>1e-6)) {
+                ctx.font='bold 14px sans-serif';ctx.fillStyle='#27ae60';ctx.textAlign='left';ctx.textBaseline='bottom';
+                const parts = [];
+                if(Math.abs(rv.Fx)>1e-6) parts.push(Math.abs(rv.Fx).toFixed(1)+'→');
+                if(Math.abs(rv.Fy)>1e-6) parts.push(Math.abs(rv.Fy).toFixed(1)+'↑');
+                ctx.fillText(parts.join('+'), p.x+12, p.y-4);
+            }
         }
     }
 
@@ -965,23 +1024,53 @@ function drawCanvas(){
                     ctx.lineTo(pi.x+frac*(pj.x-pi.x), pi.y+frac*(pj.y-pi.y));
                 }
                 ctx.closePath(); ctx.globalAlpha=0.3; ctx.fill(); ctx.globalAlpha=1.0; ctx.stroke();
-                /* label at max value station */
-                let maxSt=pts[0],maxV=0;
-                for(const st of pts){if(Math.abs(st[key])>maxV){maxV=Math.abs(st[key]);maxSt=st;}}
-                if(maxV>1e-6){
-                    const frac=maxSt.x_local/L;
-                    const bx=pi.x+frac*(pj.x-pi.x),by=pi.y+frac*(pj.y-pi.y);
-                    const val=maxSt[key]*smdScale;
-                    ctx.fillStyle=color.replace(/[\d.]+\)$/,'1)');ctx.font='9px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';
-                    ctx.fillText(label+'='+fmt(maxSt[key]),bx+nx*val,by+ny*val-3);
+            }
+        }
+        /* SMD peak labels in fixed lanes to avoid overlap */
+        if(showLblSMDV || showLblSMDM || showLblSMDN) {
+            for(const diag of R.diagrams){
+                const el=elements.find(e=>e.id===diag.element_id);if(!el)continue;
+                const ni=nodes.find(n=>n.id===el.node_i),nj=nodes.find(n=>n.id===el.node_j);if(!ni||!nj)continue;
+                const L=Math.hypot(nj.x-ni.x,nj.y-ni.y);if(L<1e-12)continue;
+                const pi=toScreen(ni.x,ni.y), pj=toScreen(nj.x,nj.y);
+                const elen=Math.hypot(pj.x-pi.x,pj.y-pi.y);
+                if(elen<1e-12)continue;
+                const tx=(pj.x-pi.x)/elen, ty=(pj.y-pi.y)/elen;
+                const pts=diag.stations;
+                /* fixed lane offsets: V=20px above, M=20px below, N=offset along element */
+                if(showShear && showLblSMDV){
+                    let maxSt=pts[0],maxV=0;
+                    for(const st of pts){if(Math.abs(st.V)>maxV){maxV=Math.abs(st.V);maxSt=st;}}
+                    if(maxV>1e-6){
+                        const frac=maxSt.x_local/L;const bx=pi.x+frac*(pj.x-pi.x),by=pi.y+frac*(pj.y-pi.y);
+                        ctx.font='bold 14px sans-serif';ctx.fillStyle='rgba(41,128,185,0.95)';ctx.textAlign='center';ctx.textBaseline='bottom';
+                        ctx.fillText('V='+fmt(maxSt.V), bx-tx*20, by-ty*20);
+                    }
                 }
-                ctx.restore();
+                if(showMom && showLblSMDM){
+                    let maxSt=pts[0],maxV=0;
+                    for(const st of pts){if(Math.abs(st.M)>maxV){maxV=Math.abs(st.M);maxSt=st;}}
+                    if(maxV>1e-6){
+                        const frac=maxSt.x_local/L;const bx=pi.x+frac*(pj.x-pi.x),by=pi.y+frac*(pj.y-pi.y);
+                        ctx.font='bold 14px sans-serif';ctx.fillStyle='rgba(142,68,173,0.95)';ctx.textAlign='center';ctx.textBaseline='top';
+                        ctx.fillText('M='+fmt(maxSt.M), bx+tx*20, by+ty*20+4);
+                    }
+                }
+                if(showN && showLblSMDN){
+                    let maxSt=pts[0],maxV=0;
+                    for(const st of pts){if(Math.abs(st.N)>maxV){maxV=Math.abs(st.N);maxSt=st;}}
+                    if(maxV>1e-6){
+                        const frac=maxSt.x_local/L;const bx=pi.x+frac*(pj.x-pi.x),by=pi.y+frac*(pj.y-pi.y);
+                        ctx.font='bold 14px sans-serif';ctx.fillStyle='rgba(230,126,34,0.95)';ctx.textAlign='left';ctx.textBaseline='middle';
+                        ctx.fillText('N='+fmt(maxSt.N), bx+tx*30, by+ty*30);
+                    }
+                }
             }
         }
     }
 
     /* Maxima flags */
-    if(showMax && R.maxima){
+    if(showMax && showLblMaxFlags && R.maxima){
         const m=R.maxima;
         /* deflection flag at node */
         {const nd=nodes.find(n=>n.id===m.deflection.node_id);if(nd){const p=toScreen(nd.x,nd.y);drawFlag(ctx,p.x,p.y-20,'dmax='+fmt(m.deflection.value),'#e74c3c');}}
@@ -1007,27 +1096,28 @@ function drawForceArrow(ctx,x,y,fx,fy,color,label){
     ctx.beginPath();ctx.moveTo(tx,ty);ctx.lineTo(x,y);ctx.stroke();
     const angle=Math.atan2(y-ty,x-tx),hl=10;
     ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-hl*Math.cos(angle-0.4),y-hl*Math.sin(angle-0.4));ctx.lineTo(x-hl*Math.cos(angle+0.4),y-hl*Math.sin(angle+0.4));ctx.closePath();ctx.fill();
-    ctx.font='9px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';
-    ctx.fillText(label+': '+fmt(fx)+','+fmt(fy),(x+tx)/2,Math.min(y,ty)-4);
+    ctx.font='bold 14px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';
+    ctx.fillText(label+': '+fmt(fx)+','+fmt(fy),(x+tx)/2,Math.min(y,ty)-6);
     ctx.restore();
 }
 
 function drawMomentArc(ctx,x,y,mz,color){
     ctx.save();ctx.strokeStyle=color||'#8e44ad';ctx.lineWidth=2;
-    const r=16,start=-Math.PI*0.75,end=Math.PI*0.5,ccw=mz>0;
+    const r=20,start=-Math.PI*0.75,end=Math.PI*0.5,ccw=mz>0;
     ctx.beginPath();ctx.arc(x,y,r,start,end,ccw);ctx.stroke();
     const tipAngle=ccw?end:start;const tx=x+r*Math.cos(tipAngle),ty=y+r*Math.sin(tipAngle);
-    ctx.fillStyle=color||'#8e44ad';ctx.beginPath();ctx.arc(tx,ty,3,0,Math.PI*2);ctx.fill();
-    ctx.font='9px sans-serif';ctx.textAlign='center';ctx.fillText('M='+fmt(mz),x,y-r-4);
+    ctx.fillStyle=color||'#8e44ad';ctx.beginPath();ctx.arc(tx,ty,4,0,Math.PI*2);ctx.fill();
+    ctx.font='bold 14px sans-serif';ctx.textAlign='center';ctx.fillStyle=color||'#8e44ad';
+    ctx.fillText('M='+fmt(mz),x,y-r-6);
     ctx.restore();
 }
 
 function drawFlag(ctx,x,y,text,color){
-    ctx.save();ctx.font='bold 9px sans-serif';const w=ctx.measureText(text).width+8;
-    ctx.fillStyle=color;ctx.globalAlpha=0.85;
-    ctx.beginPath();ctx.roundRect(x-w/2,y-12,w,14,3);ctx.fill();
+    ctx.save();ctx.font='bold 16px sans-serif';const w=ctx.measureText(text).width+10;
+    ctx.fillStyle=color;ctx.globalAlpha=0.95;
+    ctx.beginPath();ctx.roundRect(x-w/2,y-14,w,18,4);ctx.fill();
     ctx.globalAlpha=1;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(text,x,y-5);ctx.restore();
+    ctx.fillText(text,x,y-4);ctx.restore();
 }
 
 </script>

@@ -257,5 +257,13 @@ def get_diagram(
 
 
 # Serve frontend static files
-app.mount("/", StaticFiles(directory="beamfea/frontend", html=True), name="frontend")
+import os as _os
+_frontend_dir = _os.path.join(_os.path.dirname(__file__), "frontend")
+app.mount("/", StaticFiles(directory=_frontend_dir, html=True), name="frontend")
+
+
+def main() -> None:
+    """CLI entry point — start the FastAPI server on port 1337."""
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=1337)
 
