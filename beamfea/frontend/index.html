@@ -79,6 +79,52 @@
         .nf-row .nf-label { flex: 1; }
         .nf-row .nf-vals { font-family: 'SF Mono','Consolas',monospace; font-size: 0.78rem; display: flex; gap: 6px; }
         .nf-sum { font-weight: 600; border-top: 2px solid #333; padding-top: 4px; margin-top: 4px; }
+
+        /* dark mode */
+        [data-theme="dark"] { --bg-page:#1a1a2e; --bg-header:#16213e; --text-header:#e2e8f0; --bg-left:#0f1623; --bg-right:#0f1623; --bg-center:#0a0f1a; --bg-title:#1a2235; --bg-title-rhs:#1a2235; --border-color:#2a3a52; --bg-tree:#0f1623; --bg-tree-item:#1a2235; --text-tree:#cbd5e1; --bg-tree-item-hover:#243447; --bg-tree-item-sel:#1e3a5f; --border-tree-sel:#3b82f6; --bg-modal:#1e293b; --text-modal:#e2e8f0; --bg-field:#0f1623; --text-field:#94a3b8; --bg-tab:#1a2235; --text-tab:#cbd5e1; --text-tab-hov:#94a3b8; --text-data:#cbd5e1; --bg-table-header:#1a2235; --border-table:#2a3a52; --bg-table-hover:#0f1623; --bg-modal-overlay:rgba(0,0,0,0.65); --bg-status:#0f1623; --text-status:#94a3b8; --color-mode:#94a3b8; --border-mode:#2a3a52; --bg-mode-active:#6366f1; --text-mode-active:#fff; --bg-mode-hover:#2a3a52; --bg-status-bar:#0f1623; --border-status:#2a3a52; --bg-tree-header:#1a2235; --text-tree-header:#cbd5e1; --bg-tree-body:#0f1623; --bg-overlay:#1a2235; --text-overlay:#94a3b8; --bg-tree-bottom:#0f1623; --border-tree-bottom:#2a3a52; --text-tree-bottom:#cbd5e1; --bg-data-table:#0f1623; --bg-data-table-hover:#1a2235; --bg-data-table-border:#2a3a52; --bg-data-table-th:#1a2235; --text-data-table:#e2e8f0; --text-data-table-th:#94a3b8; --bg-modal-overlay-light:rgba(0,0,0,0.2); --bg-input:#0f1623; --text-input:#cbd5e1; --border-input:#2a3a52; }
+        [data-theme="dark"] body { background:var(--bg-page); color:var(--bg-modal); }
+        [data-theme="dark"] header { background:var(--bg-header); color:var(--text-header); }
+        [data-theme="dark"] .left, [data-theme="dark"] .right { background:var(--bg-left); }
+        [data-theme="dark"] .center { background:var(--bg-center); }
+        [data-theme="dark"] .pane { border-color:var(--border-color); }
+        [data-theme="dark"] .pane-title { background:var(--bg-title); color:var(--text-tree); border-bottom-color:var(--border-color); }
+        [data-theme="dark"] .center .pane-title { background:var(--bg-title-rhs); }
+        [data-theme="dark"] #model-tree { background:var(--bg-tree); }
+        [data-theme="dark"] .tree-header { background:var(--bg-tree-header); color:var(--text-tree-header); border-color:var(--border-color); }
+        [data-theme="dark"] .tree-header:hover { background:var(--bg-tree-item-hover); }
+        [data-theme="dark"] .tree-body { background:var(--bg-tree-body); }
+        [data-theme="dark"] .tree-item { background:var(--bg-tree-item); color:var(--text-tree); border-color:var(--border-color); }
+        [data-theme="dark"] .tree-item:hover { background:var(--bg-tree-item-hover); }
+        [data-theme="dark"] .tree-item.selected { background:var(--bg-tree-item-sel); border-color:var(--border-tree-sel); }
+        [data-theme="dark"] .tree-bottom { background:var(--bg-tree-bottom); border-top-color:var(--border-tree-bottom); color:var(--text-tree-bottom); }
+        [data-theme="dark"] .tree-bottom button { background:#1e3a5f; color:var(--text-tree-bottom); border-color:var(--border-color); }
+        [data-theme="dark"] .tree-bottom button:hover { background:#243447; }
+        [data-theme="dark"] .tree-bottom button:disabled { background:#1a2235; color:#4a5568; }
+        [data-theme="dark"] .mode-bar { background:var(--bg-tree-header); padding:2px 4px; border-radius:4px; border:1px solid var(--border-color); }
+        [data-theme="dark"] .mode-btn { background:#1a2235; color:var(--text-tree); border-color:var(--border-color); }
+        [data-theme="dark"] .mode-btn:hover:not(.active) { background:var(--bg-mode-hover); }
+        [data-theme="dark"] .mode-btn.active { background:var(--bg-mode-active); color:var(--text-mode-active); border-color:var(--bg-mode-active); }
+        [data-theme="dark"] .status-bar { background:var(--bg-status-bar); border-top-color:var(--border-status); color:var(--text-status); }
+        [data-theme="dark"] .status-bar .mode-label { color:#60a5fa; }
+        [data-theme="dark"] .status-bar .help-text { color:#64748b; }
+        [data-theme="dark"] .overlay-bar { background:rgba(26,34,53,0.92); border-color:var(--border-color); color:var(--text-overlay); }
+        [data-theme="dark"] .results-controls { border-bottom-color:var(--border-color); }
+        [data-theme="dark"] .results-controls button { background:#1e3a5f; }
+        [data-theme="dark"] .tab-btn { background:var(--bg-tab); color:var(--text-tab); border-bottom-color:transparent; }
+        [data-theme="dark"] .tab-btn.active { background:var(--bg-center); color:var(--text-tree); border-bottom-color:var(--border-tree-sel); }
+        [data-theme="dark"] .tab-btn:hover:not(.active) { background:var(--bg-tree-item-hover); color:var(--text-tree); }
+        [data-theme="dark"] .tab-content { background:var(--bg-center); color:var(--text-data); }
+        [data-theme="dark"] .data-table th { background:var(--bg-data-table-th); color:var(--text-data-table-th); border-bottom-color:var(--border-table); }
+        [data-theme="dark"] .data-table td { border-bottom-color:var(--bg-data-table); color:var(--text-data-table); }
+        [data-theme="dark"] .data-table tr:hover td { background:var(--bg-data-table-hover); }
+        [data-theme="dark"] button { background:#1e3a5f; color:var(--text-tree); border-color:var(--border-color); }
+        [data-theme="dark"] button:hover { background:#243447; }
+        [data-theme="dark"] button:disabled { background:#1a2235; color:#4a5568; border-color:var(--border-color); }
+        [data-theme="dark"] .modal { background:var(--bg-modal-overlay); }
+        [data-theme="dark"] .modal-content { background:var(--bg-modal); color:var(--text-modal); }
+        [data-theme="dark"] .field { color:var(--text-field); }
+        [data-theme="dark"] .field label { color:var(--text-field); }
+        [data-theme="dark"] .field input, [data-theme="dark"] .field select { background:var(--bg-field); color:var(--text-input); border-color:var(--border-input); }
     </style>
 </head>
 <body>
@@ -87,9 +133,10 @@
         <div class="pane left">
             <div class="pane-title">Model Tree</div>
             <div id="model-tree"></div>
-            <div class="tree-bottom">
+            <div class="tree-bottom" style="flex-wrap:wrap;gap:4px">
                 <button id="save-btn" disabled style="flex:1">Save</button>
                 <button id="load-btn" style="flex:1">Load</button>
+                <button id="theme-toggle" title="Toggle dark mode" style="flex:0 0 100%;font-size:13px">Dark mode</button>
             </div>
         </div>
         <div class="pane center">
@@ -222,6 +269,7 @@
 const API = '';
 let modelId = null;
 let nodes = [], elements = [], bcs = [], loads = [];
+let savedName = '';
 let mode = 'select';
 let selNodeId = null, elemFirst = null;
 let editBcIdx = null, editLoadIdx = null, editElemIdx = null, editNodeIdx = null;
@@ -278,6 +326,14 @@ function wire() {
     document.getElementById('solve-btn').addEventListener('click', doSolve);
     document.getElementById('save-btn').addEventListener('click', doSaveFile);
     document.getElementById('load-btn').addEventListener('click', () => document.getElementById('file-input').click());
+    const themeBtn = document.getElementById('theme-toggle');
+    const stored = localStorage.getItem('beamfea-theme');
+    if (stored === 'dark') { document.documentElement.setAttribute('data-theme','dark'); themeBtn.textContent='Light mode'; }
+    themeBtn.addEventListener('click', () => {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        if (isDark) { document.documentElement.removeAttribute('data-theme'); themeBtn.textContent='Dark mode'; localStorage.setItem('beamfea-theme','light'); }
+        else { document.documentElement.setAttribute('data-theme','dark'); themeBtn.textContent='Light mode'; localStorage.setItem('beamfea-theme','dark'); }
+    });
     document.getElementById('file-input').addEventListener('change', doLoadFile);
     document.getElementById('bc-save').addEventListener('click', commitBc);
     document.getElementById('bc-cancel').addEventListener('click', () => closeModal('bc-modal'));
@@ -701,7 +757,17 @@ function fmtGrid(v){if(v===0)return'0';if(Number.isInteger(v))return v.toString(
 /* ══════════════════════════════════════════════════════════════
    FILE I/O
    ══════════════════════════════════════════════════════════════ */
-function doSaveFile(){const b=new Blob([JSON.stringify(buildModel(),null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='model.beamfea.json';a.click();}
+function doSaveFile(){
+        const base = prompt('File name (without extension):', savedName || 'model');
+        if (base === null) return;
+        const name = (base.replace(/\s/g,'-').toLowerCase().trim() || 'model') + '.beamfea.json';
+        const b = new Blob([JSON.stringify(buildModel(),null,2)],{type:'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(b);
+        a.download = name;
+        a.click();
+        savedName = base.trim();
+    }
 async function doLoadFile(e){const f=e.target.files[0];if(!f)return;try{const m=JSON.parse(await f.text());nodes=m.nodes||[];elements=m.elements||[];bcs=m.bcs||[];loads=m.nodal_loads||[];R=null;after();}catch(err){alert('Load failed: '+err.message);}e.target.value='';}
 
 /* ══════════════════════════════════════════════════════════════
