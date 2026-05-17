@@ -1,5 +1,12 @@
 # AGENTS.md
 
+## Repository
+
+- **Gitea**: `http://10.0.0.98:3000/connellwc83/beamfea`
+- **Remote**: `http://10.0.0.98:3000/connellwc83/beamfea.git`
+- **GitHub remote removed**: Do not push to or reference the old GitHub repo.
+- When initializing a fresh session, always verify the Gitea remote is set with `git remote -v`.
+
 ## Standing Rules — Apply To Every Task
 
 1. **No test mutation without permission.** You may add new tests. You may not remove, rename, restructure, or narrow the scope of existing tests, including parametrized loops. If an existing test fails, the failure is information — fix the code under test or fix the expected data, do not change the test structure to avoid the failure.
