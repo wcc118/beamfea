@@ -133,12 +133,10 @@ def compute_internal_force_diagrams(
     elements: list[dict],
     element_end_forces: list[dict],
     element_loads: list[dict] = None,
-    num_stations: int = 50,
 ) -> list[dict]:
-    """Compute internal force diagrams sampled at num_stations points per element.
+    """Compute internal force diagrams sampled at 3 points per element.
 
-    Sampling stations always include i-end (x=0), midspan (x=L/2), and j-end (x=L),
-    with additional evenly-spaced points to reach num_stations total.
+    Sampling stations: i-end (x=0), midspan (x=L/2), j-end (x=L)
 
     Internal force functions derived from equilibrium of segment [0, x],
     where N_i, V_i, M_i are the element end-forces at the i-node from
@@ -158,11 +156,9 @@ def compute_internal_force_diagrams(
         elements: List of element dicts
         element_end_forces: Output from compute_element_end_forces
         element_loads: Optional element load dicts
-        num_stations: Number of sample stations per element (default 50).
-            Minimum 3 stations (i-end, midspan, j-end) are always included.
 
     Returns:
-        List of dicts with element_id and 'stations' array of num_stations points
+        List of dicts with element_id and 'stations' array of 3 points
     """
     element_map = {e["id"]: e for e in elements}
     loads_map = {load["element_id"]: load for load in (element_loads or [])}
@@ -194,20 +190,7 @@ def compute_internal_force_diagrams(
 
         stations = []
 
-        # Build station list: always include 0, L/2, L as first 3 stations,
-        # then fill remaining with evenly-spaced interior points
-        required = [0.0, L / 2.0, L]
-        if num_stations <= 3:
-            x_values = required
-        else:
-            # Generate interior points (exclude endpoints already in required)
-            interior = np.linspace(0, L, num_stations, endpoint=False)[1:]
-            # Remove duplicates of required values (tolerance for float comparison)
-            tol = L * 1e-12
-            interior = [x for x in interior if all(abs(x - r) > tol for r in required)]
-            x_values = required + sorted(interior)
-
-        for x in x_values:
+        for x in [0.0, L / 2.0, L]:
             N = -N_i - w_axial * x
             V = V_i + w_transverse * x
             M = M_i - V_i * x - w_transverse * x**2 / 2.0
