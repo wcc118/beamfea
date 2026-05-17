@@ -6,7 +6,7 @@ Conventions: see beamfea/conventions.md.
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class Node(BaseModel):
@@ -28,6 +28,22 @@ class Material(BaseModel):
     E: float
     nu: float
 
+    @field_validator("E")
+    @classmethod
+    def validate_E_positive(cls, v: float) -> float:
+        """Young's modulus must be strictly positive (Cook 4th ed., §2.3)."""
+        if v <= 0:
+            raise ValueError(f"E must be > 0, got {v}")
+        return v
+
+    @field_validator("nu")
+    @classmethod
+    def validate_nu_range(cls, v: float) -> float:
+        """Poisson's ratio must be in (0, 0.5) for physically realistic materials."""
+        if v <= 0 or v >= 0.5:
+            raise ValueError(f"nu must be in (0, 0.5), got {v}")
+        return v
+
 
 class Element(BaseModel):
     """A 2-node Euler-Bernoulli beam element.
@@ -47,6 +63,22 @@ class Element(BaseModel):
     release_i_Mz: bool = False
     release_j_Mz: bool = False
     depth: float | None = None
+
+    @field_validator("A")
+    @classmethod
+    def validate_A_positive(cls, v: float) -> float:
+        """Cross-sectional area must be strictly positive (Cook 4th ed., §2.3)."""
+        if v <= 0:
+            raise ValueError(f"A must be > 0, got {v}")
+        return v
+
+    @field_validator("Iz")
+    @classmethod
+    def validate_Iz_positive(cls, v: float) -> float:
+        """Moment of inertia must be strictly positive (Cook 4th ed., §2.3)."""
+        if v <= 0:
+            raise ValueError(f"Iz must be > 0, got {v}")
+        return v
 
 
 class NodalBC(BaseModel):
