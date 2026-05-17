@@ -16,7 +16,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from beamfea.assembly import assemble_global_stiffness, assemble_nodal_loads
+from beamfea.assembly import (
+    _dof_type_to_index,
+    assemble_global_stiffness,
+    assemble_nodal_loads,
+    node_gdof,
+)
 from beamfea.element import (
     condense_rotational_dof,
     element_stiffness_local,
@@ -90,8 +95,8 @@ def compute_element_end_forces(
 
         T = transformation_matrix(theta)
 
-        gdof = [3 * node_i, 3 * node_i + 1, 3 * node_i + 2,
-                3 * node_j, 3 * node_j + 1, 3 * node_j + 2]
+        gdof = [node_gdof(node_i, k) for k in range(3)] + \
+               [node_gdof(node_j, k) for k in range(3)]
         d_element = d_full[gdof]
 
         load = loads_map.get(elem_id)
@@ -261,14 +266,7 @@ def compute_gpf_balance(
         node_id = bc["node_id"]
         dof_type = bc["dof"]
 
-        if dof_type == "u":
-            gdof = 3 * node_id
-        elif dof_type == "v":
-            gdof = 3 * node_id + 1
-        elif dof_type == "rz":
-            gdof = 3 * node_id + 2
-        else:
-            raise ValueError(f"Unknown dof type: {dof_type}")
+        gdof = node_gdof(node_id, _dof_type_to_index(dof_type))
 
         constrained.add(gdof)
         bc_values[gdof] = bc["value"]
@@ -294,11 +292,7 @@ def compute_gpf_balance(
     max_forces = np.zeros(n_nodes)
 
     for node_id in range(n_nodes):
-        gdof_u = 3 * node_id
-        gdof_v = 3 * node_id + 1
-        gdof_rz = 3 * node_id + 2
-
-        idx = [gdof_u, gdof_v, gdof_rz]
+        idx = [node_gdof(node_id, k) for k in range(3)]
 
         F_node = F[idx]
         R_node = R[idx]
@@ -377,8 +371,8 @@ def compute_element_node_contributions(
             K_local = condense_rotational_dof(K_local, release_i, release_j)
         T = transformation_matrix(theta)
 
-        gdof = [3 * ni_id, 3 * ni_id + 1, 3 * ni_id + 2,
-                3 * nj_id, 3 * nj_id + 1, 3 * nj_id + 2]
+        gdof = [node_gdof(ni_id, k) for k in range(3)] + \
+               [node_gdof(nj_id, k) for k in range(3)]
         d_elem = d_full[gdof]
 
         load = loads_map.get(elem_id)
@@ -546,11 +540,9 @@ def compute_maxima(
     transverse_vec = np.zeros(3)
 
     for node_id in range(len(nodes)):
-        gdof_u = 3 * node_id
-        gdof_v = 3 * node_id + 1
-        gdof_rz = 3 * node_id + 2
-
-        u, v, rz = d_full[gdof_u], d_full[gdof_v], d_full[gdof_rz]
+        u = d_full[node_gdof(node_id, 0)]
+        v = d_full[node_gdof(node_id, 1)]
+        rz = d_full[node_gdof(node_id, 2)]
 
         abs_v = abs(v)
 
@@ -565,11 +557,9 @@ def compute_maxima(
     axial_disp_vec = np.zeros(3)
 
     for node_id in range(len(nodes)):
-        gdof_u = 3 * node_id
-        gdof_v = 3 * node_id + 1
-        gdof_rz = 3 * node_id + 2
-
-        u, v, rz = d_full[gdof_u], d_full[gdof_v], d_full[gdof_rz]
+        u = d_full[node_gdof(node_id, 0)]
+        v = d_full[node_gdof(node_id, 1)]
+        rz = d_full[node_gdof(node_id, 2)]
 
         abs_u = abs(u)
 
@@ -584,11 +574,9 @@ def compute_maxima(
     rotation_vec = np.zeros(3)
 
     for node_id in range(len(nodes)):
-        gdof_u = 3 * node_id
-        gdof_v = 3 * node_id + 1
-        gdof_rz = 3 * node_id + 2
-
-        u, v, rz = d_full[gdof_u], d_full[gdof_v], d_full[gdof_rz]
+        u = d_full[node_gdof(node_id, 0)]
+        v = d_full[node_gdof(node_id, 1)]
+        rz = d_full[node_gdof(node_id, 2)]
 
         abs_rz = abs(rz)
 
