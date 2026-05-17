@@ -508,11 +508,13 @@ def compute_maxima(
     """Compute global maxima of key quantities with locations.
 
     Returns max of:
-        - |deflection| (vector magnitude) with location and direction
-        - |M| (bending moment)
-        - |V| (shear force)
-        - |N| (axial force)
-        - |σ_combined| (max combined stress)
+        - max |v| (transverse deflection, in) with location
+        - max |u| (axial displacement, in) with location
+        - max |rz| (rotation, rad) with location
+        - |M| (bending moment, lb-in)
+        - |V| (shear force, lb)
+        - |N| (axial force, lb)
+        - |σ_combined| (max combined stress, psi)
 
     Args:
         element_end_forces: Output from compute_element_end_forces
@@ -522,14 +524,18 @@ def compute_maxima(
         nodes: List of node dicts
 
     Returns:
-        Dict with keys: deflection, moment, shear, axial, stress
-        Each value is a dict with 'value', 'location' (node_id or element_id, station)
+        Dict with keys: transverse_deflection, axial_displacement, max_rotation,
+        moment, shear, axial, stress.
     """
     node_map = {n["id"]: n for n in nodes}
 
-    deflection_max = 0.0
-    deflection_loc = {"node_id": 0, "direction": "u"}
-    deflection_vec = np.zeros(3)
+    # --- Maximum transverse deflection: max |v| across all nodes ---
+    # Transverse deflection is the meaningful serviceability parameter for 2D beams.
+    # Per Cook 4th ed., §2.3 and McGuire-Gallagher-Ziemer 2nd ed., Ch. 5,
+    # the Hermite shape functions relate nodal v values to the deflection curve.
+    transverse_max = 0.0
+    transverse_loc = {"node_id": 0, "direction": "v"}
+    transverse_vec = np.zeros(3)
 
     for node_id in range(len(nodes)):
         gdof_u = 3 * node_id
@@ -538,19 +544,50 @@ def compute_maxima(
 
         u, v, rz = d_full[gdof_u], d_full[gdof_v], d_full[gdof_rz]
 
-        mag = np.sqrt(u**2 + v**2 + rz**2)
+        abs_v = abs(v)
 
-        if mag > deflection_max:
-            deflection_max = mag
-            if u**2 >= v**2 and u**2 >= rz**2:
-                deflection_loc = {"node_id": node_id, "direction": "u"}
-                deflection_vec = np.array([u, v, rz])
-            elif v**2 >= rz**2:
-                deflection_loc = {"node_id": node_id, "direction": "v"}
-                deflection_vec = np.array([u, v, rz])
-            else:
-                deflection_loc = {"node_id": node_id, "direction": "rz"}
-                deflection_vec = np.array([u, v, rz])
+        if abs_v > transverse_max:
+            transverse_max = abs_v
+            transverse_loc = {"node_id": node_id, "direction": "v"}
+            transverse_vec = np.array([u, v, rz])
+
+    # --- Maximum axial displacement: max |u| across all nodes ---
+    axial_disp_max = 0.0
+    axial_disp_loc = {"node_id": 0}
+    axial_disp_vec = np.zeros(3)
+
+    for node_id in range(len(nodes)):
+        gdof_u = 3 * node_id
+        gdof_v = 3 * node_id + 1
+        gdof_rz = 3 * node_id + 2
+
+        u, v, rz = d_full[gdof_u], d_full[gdof_v], d_full[gdof_rz]
+
+        abs_u = abs(u)
+
+        if abs_u > axial_disp_max:
+            axial_disp_max = abs_u
+            axial_disp_loc = {"node_id": node_id}
+            axial_disp_vec = np.array([u, v, rz])
+
+    # --- Maximum rotation: max |rz| across all nodes ---
+    rotation_max = 0.0
+    rotation_loc = {"node_id": 0}
+    rotation_vec = np.zeros(3)
+
+    for node_id in range(len(nodes)):
+        gdof_u = 3 * node_id
+        gdof_v = 3 * node_id + 1
+        gdof_rz = 3 * node_id + 2
+
+        u, v, rz = d_full[gdof_u], d_full[gdof_v], d_full[gdof_rz]
+
+        abs_rz = abs(rz)
+
+        if abs_rz > rotation_max:
+            rotation_max = abs_rz
+            rotation_loc = {"node_id": node_id}
+            rotation_vec = np.array([u, v, rz])
 
     moment_max = 0.0
     moment_loc = {"element_id": 0, "station": 0.0}
@@ -602,17 +639,30 @@ def compute_maxima(
                 stress_max = sigma_minus
                 stress_loc = {"element_id": elem_id, "station": station["x_local"], "type": "minus"}
 
-    node_pos = node_map[deflection_loc["node_id"]]
-    deflection_dir = deflection_vec / (np.linalg.norm(deflection_vec) if np.linalg.norm(deflection_vec) > 0 else 1)
+    # Coordinates of node with max transverse deflection
+    transverse_node_pos = node_map[transverse_loc["node_id"]]
 
     return {
-        "deflection": {
-            "value": deflection_max,
-            "node_id": deflection_loc["node_id"],
-            "x": node_pos["x"],
-            "y": node_pos["y"],
-            "direction": deflection_loc["direction"],
-            "displacement_vector": deflection_vec.tolist()
+        "transverse_deflection": {
+            "value": transverse_max,
+            "node_id": transverse_loc["node_id"],
+            "x": transverse_node_pos["x"],
+            "y": transverse_node_pos["y"],
+            "displacement_vector": transverse_vec.tolist()
+        },
+        "axial_displacement": {
+            "value": axial_disp_max,
+            "node_id": axial_disp_loc["node_id"],
+            "x": node_map[axial_disp_loc["node_id"]]["x"],
+            "y": node_map[axial_disp_loc["node_id"]]["y"],
+            "displacement_vector": axial_disp_vec.tolist()
+        },
+        "max_rotation": {
+            "value": rotation_max,
+            "node_id": rotation_loc["node_id"],
+            "x": node_map[rotation_loc["node_id"]]["x"],
+            "y": node_map[rotation_loc["node_id"]]["y"],
+            "displacement_vector": rotation_vec.tolist()
         },
         "moment": {
             "value": moment_max,
@@ -624,7 +674,7 @@ def compute_maxima(
             "element_id": shear_loc["element_id"],
             "station": shear_loc["station"]
         },
-        "axial": {
+        "axial_force": {
             "value": axial_max,
             "element_id": axial_loc["element_id"],
             "station": axial_loc["station"]
@@ -636,3 +686,4 @@ def compute_maxima(
             "type": stress_loc["type"]
         }
     }
+
