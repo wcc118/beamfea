@@ -95,3 +95,39 @@
 3. Every module computing or displaying internal forces references `conventions.md §2` in its docstring header.
 4. No silent unit conversions. No silent sign flips. Named transformations only.
 5. **English-only documentation.** All comments, docstrings, and string literals in Python source files must be English. DOF ordering: [u, v, θz]; sign convention: tension +N, clockwise shear +V, sagging +M. Mathematical notation (θ, β, ×, ², ·, √, etc.) is allowed where contextually appropriate. Exception: foundation_spec.md and conventions.md may contain intentional Unicode mathematical characters.
+
+---
+
+## Sub-issue tracking
+
+Gitea does not have native parent-child issue metadata. Use cross-referenced comments to link related issues.
+
+### Labels
+
+- `sprint-1`, `sprint-2`, … — scheduling order. Work sprints sequentially.
+- Priority labels (`p1-high`, `p2-medium`, `p3-low`) set urgency within a sprint.
+- Status labels (`status/backlog` through `status/done`) track lifecycle.
+
+### Linking procedure
+
+1. **Parent issue** gets a summary comment listing all children:
+
+   ```markdown
+   ## Sub-issues
+   - #13 — Pydantic validators (sprint-1)
+   - #14 — Centralize gdof (sprint-1) — depends on #13
+   ```
+
+2. **Child issues** get a comment linking back:
+
+   ```markdown
+   Part of #19. Sprint: sprint-1.
+   ```
+
+3. **Dependencies** between children are noted explicitly with "depends on #N" or "blocked by #N" in the child issue body or a comment.
+
+### Completion
+
+- When a child closes, apply `status/done` to it.
+- The parent stays open until all children are closed.
+- After the last child closes, close the parent and apply `status/done`.
