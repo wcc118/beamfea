@@ -82,15 +82,13 @@ def save_results_csv(results: dict, path: str | Path) -> None:
                 ])
 
     # Reactions CSV
-    if "gpf_balance" in results:
-        residuals = results["gpf_balance"].get("residuals", [])
+    reactions = results.get("reactions", [])
+    if reactions:
         with open(path.with_suffix(".reactions.csv"), "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["node_id", "dof", "reaction"])
-            for i in range(len(residuals)):
-                node_id = i // 3
-                dof_name = ["u", "v", "rz"][i % 3]
-                writer.writerow([node_id, dof_name, residuals[i]])
+            for r in reactions:
+                writer.writerow([r["node_id"], r["dof"], r["value"]])
 
     # End forces CSV
     end_forces = results.get("end_forces", [])
