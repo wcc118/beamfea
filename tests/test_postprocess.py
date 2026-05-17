@@ -496,3 +496,123 @@ def test_release_condensation_colinear_reaction():
     assert np.isclose(Fy_sum, 1000.0, atol=1e-6), (
         f"Global ∑Fy = {Fy_sum}, expected +1000 to balance -1000 load"
     )
+
+
+def test_equilibrium_sign_chain():
+    """Verify dN/dx = -w_a, dV/dx = w_t, dM/dx = -V from compute_internal_force_diagrams.
+
+    The internal force functions in
+    ``compute_internal_force_diagrams`` (per conventions.md §2) are:
+
+        N(x) = -N_i - w_a · x
+        V(x) =  V_i + w_t · x
+        M(x) =  M_i - V_i·x - w_t·x²/2
+
+    Their derivatives must satisfy the differential equilibrium ODEs:
+
+        dN/dx = -w_axial   (axial force balance)
+        dV/dx = +w_transverse   (transverse force balance, w upward-positive)
+        dM/dx = -V                (moment balance, sagging-positive per conventions.md)
+
+    Uses V2 (cantilever with UDL downward) to verify all three ODEs with
+    finite differences at interior and boundary stations.
+
+    Ref: conventions.md §2 (dM/dx = -V explicitly stated);
+    Cook 4th ed. §2.3 (differential equilibrium of beam element).
+    """
+    with open('tests/validation/V2_model.json') as f:
+        model = json.load(f)
+
+    nodes = model['nodes']
+    elements = model['elements']
+    materials = model['materials']
+    bcs = model['bcs']
+    nodal_loads = model['nodal_loads']
+    element_loads = model.get('element_loads', [])
+
+    d_full, _, _ = solve_linear_static(
+        nodes, elements, materials, bcs, nodal_loads, element_loads
+    )
+
+    end_forces = compute_element_end_forces(
+        nodes, elements, materials, d_full, element_loads
+    )
+    diagrams = compute_internal_force_diagrams(
+        nodes, elements, end_forces, element_loads
+    )
+
+    # Tolerance for finite-difference derivative check
+    fd_tol = 1e-10
+
+    for diagram in diagrams:
+        stations = diagram['stations']
+        elem_id = diagram['element_id']
+        elem = next(e for e in elements if e['id'] == elem_id)
+        L = np.sqrt(
+            (nodes[elem['node_j']]['x'] - nodes[elem['node_i']]['x'])**2 +
+            (nodes[elem['node_j']]['y'] - nodes[elem['node_i']]['y'])**2
+        )
+
+        load = next((l for l in element_loads if l['element_id'] == elem_id), {})
+        w_a = load.get('w_axial', 0.0)
+        w_t = load.get('w_transverse', 0.0)
+
+        # Skip elements with no distributed load
+        if abs(w_t) < 1e-15 and abs(w_a) < 1e-15:
+            continue
+
+        # Sort stations by x_local (compute_internal_force_diagrams returns
+        # [i-end, midspan, j-end] first, then sorted interior points, so the
+        # list may be interleaved.  Sort to guarantee contiguous x-ordering.
+        sorted_stations = sorted(stations, key=lambda s: s['x_local'])
+        n = len(sorted_stations)
+
+        # Central difference at each interior station
+        for i in range(1, n - 1):
+            x_k = sorted_stations[i]['x_local']
+            dx_plus = sorted_stations[i + 1]['x_local'] - x_k
+            dx_minus = x_k - sorted_stations[i - 1]['x_local']
+            dx_total = sorted_stations[i + 1]['x_local'] - sorted_stations[i - 1]['x_local']
+            if abs(dx_total) < 1e-15:
+                continue
+
+            # dN/dx ≈ (N_{i+1} - N_{i-1}) / dx_total
+            dN = (sorted_stations[i + 1]['N'] - sorted_stations[i - 1]['N']) / dx_total
+            assert np.isclose(dN, -w_a, atol=fd_tol), (
+                f"elem {elem_id} station x={x_k:.4f}: dN/dx={dN}, expected -w_a={-w_a}"
+            )
+
+            # dV/dx ≈ (V_{i+1} - V_{i-1}) / dx_total
+            dV = (sorted_stations[i + 1]['V'] - sorted_stations[i - 1]['V']) / dx_total
+            assert np.isclose(dV, w_t, atol=fd_tol), (
+                f"elem {elem_id} station x={x_k:.4f}: dV/dx={dV}, expected w_t={w_t}"
+            )
+
+            # dM/dx ≈ (M_{i+1} - M_{i-1}) / dx_total — should equal -V at x_k
+            dM = (sorted_stations[i + 1]['M'] - sorted_stations[i - 1]['M']) / dx_total
+            V_at_k = sorted_stations[i]['V']
+            assert np.isclose(dM, -V_at_k, atol=fd_tol), (
+                f"elem {elem_id} station x={x_k:.4f}: dM/dx={dM}, expected -V={-V_at_k}"
+            )
+
+        # Forward difference at x=0 boundary — first-order accurate,
+        # so tolerance must scale with dx (truncation error ~dx/2 * f"")
+        dx_fwd = sorted_stations[1]['x_local'] - sorted_stations[0]['x_local']
+        if abs(dx_fwd) >= 1e-15:
+            # fd_tol_fwd accounts for O(dx) truncation of forward differencing
+            fd_tol_fwd = max(1e-10, abs(dx_fwd) * max(abs(w_t), abs(w_a)) / 2.0)
+            dN_fwd = (sorted_stations[1]['N'] - sorted_stations[0]['N']) / dx_fwd
+            assert np.isclose(dN_fwd, -w_a, atol=fd_tol_fwd), (
+                f"elem {elem_id} x=0 forward: dN/dx={dN_fwd}, expected -w_a={-w_a}"
+            )
+
+            dV_fwd = (sorted_stations[1]['V'] - sorted_stations[0]['V']) / dx_fwd
+            assert np.isclose(dV_fwd, w_t, atol=fd_tol_fwd), (
+                f"elem {elem_id} x=0 forward: dV/dx={dV_fwd}, expected w_t={w_t}"
+            )
+
+            dM_fwd = (sorted_stations[1]['M'] - sorted_stations[0]['M']) / dx_fwd
+            V_0 = sorted_stations[0]['V']
+            assert np.isclose(dM_fwd, -V_0, atol=fd_tol_fwd), (
+                f"elem {elem_id} x=0 forward: dM/dx={dM_fwd}, expected -V={-V_0}"
+            )
