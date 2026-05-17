@@ -22,6 +22,7 @@ from beamfea.element import (
     element_stiffness_local,
     transformation_matrix,
 )
+from beamfea.loads import fixed_end_forces_local
 
 
 def compute_element_end_forces(
@@ -93,21 +94,16 @@ def compute_element_end_forces(
                 3 * node_j, 3 * node_j + 1, 3 * node_j + 2]
         d_element = d_full[gdof]
 
-        f_fixed = np.zeros(6)
         load = loads_map.get(elem_id)
         if load:
-            w_axial = load.get("w_axial", 0.0)
-            w_transverse = load.get("w_transverse", 0.0)
-
-            if w_axial != 0:
-                f_fixed[0] = w_axial * L / 2
-                f_fixed[3] = w_axial * L / 2
-
-            if w_transverse != 0:
-                f_fixed[1] = w_transverse * L / 2
-                f_fixed[2] = w_transverse * L**2 / 12
-                f_fixed[4] = w_transverse * L / 2
-                f_fixed[5] = -w_transverse * L**2 / 12
+            f_fixed = fixed_end_forces_local(
+                E, A, Iz, L,
+                load.get("w_axial", 0.0),
+                load.get("w_transverse", 0.0),
+                release_i, release_j
+            )
+        else:
+            f_fixed = np.zeros(6)
 
         # Transform global displacements to local frame before K_local multiplication
         d_local = T @ d_element
@@ -385,19 +381,16 @@ def compute_element_node_contributions(
                 3 * nj_id, 3 * nj_id + 1, 3 * nj_id + 2]
         d_elem = d_full[gdof]
 
-        f_fixed = np.zeros(6)
         load = loads_map.get(elem_id)
         if load:
-            wa = load.get("w_axial", 0.0)
-            wt = load.get("w_transverse", 0.0)
-            if wa != 0:
-                f_fixed[0] = wa * L / 2
-                f_fixed[3] = wa * L / 2
-            if wt != 0:
-                f_fixed[1] = wt * L / 2
-                f_fixed[2] = wt * L**2 / 12
-                f_fixed[4] = wt * L / 2
-                f_fixed[5] = -wt * L**2 / 12
+            f_fixed = fixed_end_forces_local(
+                E, A, Iz, L,
+                load.get("w_axial", 0.0),
+                load.get("w_transverse", 0.0),
+                release_i, release_j
+            )
+        else:
+            f_fixed = np.zeros(6)
 
         d_local = T @ d_elem
         f_local = K_local @ d_local - f_fixed
