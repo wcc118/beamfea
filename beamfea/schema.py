@@ -33,6 +33,10 @@ class Element(BaseModel):
     """A 2-node Euler-Bernoulli beam element.
 
     Properties: length L (computed from node coords), E, A, Iz, optional end-releases.
+    Optional ``depth`` gives the cross-section depth in the strong-axis direction;
+    used by stress computation to set the extreme-fiber distance c = depth / 2.
+    Per Cook 4th ed. §2.3: σ = N/A ± M·c/Iz, where c is the distance from the
+    neutral axis to the extreme fiber.
     """
     id: int
     node_i: int
@@ -42,6 +46,7 @@ class Element(BaseModel):
     Iz: float
     release_i_Mz: bool = False
     release_j_Mz: bool = False
+    depth: float | None = None
 
 
 class NodalBC(BaseModel):
