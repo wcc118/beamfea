@@ -14,6 +14,20 @@ from __future__ import annotations
 
 import numpy as np
 
+#: Stub stiffness assigned to a released rotational DOF.
+#:
+#: Technique: "hinged stiffness matrix" (Cook 4th ed., §2.7). A released
+#: (pinned) rotational DOF receives a very small diagonal value instead of
+#: algebraic condensation.  1e-10 is chosen to be well below the smallest
+#: expected bending stiffness.  For typical steel framing (E = 29e6 psi,
+#: L ~ 10-100 ft, I ~ 100-1000 in^4):
+#:
+#:     k_bend ~ EI/L^3 ~ 29e6*500/(120^3) ~ 8.4e3 lb-in/rad
+#:
+#: 1e-10 is ~13 orders of magnitude smaller, so the stub force F_stub =
+#: k_stub * d_rotation is negligible in the equilibrium equations.
+RELEASE_STIFFNESS = 1e-10
+
 
 def element_stiffness_local(E: float, A: float, Iz: float, L: float) -> np.ndarray:
     """Compute local stiffness matrix for Euler-Bernoulli beam element.
@@ -179,7 +193,7 @@ def condense_rotational_dof(K_local: np.ndarray, release_i: bool, release_j: boo
             for i, ri in enumerate(keep_doFs):
                 for j, rj in enumerate(keep_doFs):
                     K_released[ri, rj] = K_cond[i, j]
-            K_released[release_dof, release_dof] = 1e-10
+            K_released[release_dof, release_dof] = RELEASE_STIFFNESS
             # Off-diagonals of release_dof's row/col are already 0
 
             return K_released
