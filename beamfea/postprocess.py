@@ -427,14 +427,21 @@ def compute_stresses(
 ) -> list[dict]:
     """Compute combined stress at element stations.
 
-    Stress formulas:
+    Stress formulas per Cook 4th ed. §2.3:
         σ_axial = N / A
-        σ_bending,max = |M| · c / Iz  where c = √(Iz/A)
+        σ_bending,max = |M| · c / Iz
         σ_combined = σ_axial ± σ_bending,max
+
+    where c is the distance from the neutral axis to the extreme fiber:
+        - If element has ``depth``:    c = depth / 2
+        - Otherwise (backward compat): c = sqrt(Iz / A)
+
+    Refs: Cook 4th ed., §2.3 (beam stress);
+          McGuire-Gallagher-Ziemer 2nd ed., Ch. 5 (stress in beams)
 
     Args:
         nodes: List of node dicts
-        elements: List of element dicts
+        elements: List of element dicts (each may have optional 'depth')
         element_end_forces: Output from compute_element_end_forces
 
     Returns:
@@ -463,7 +470,15 @@ def compute_stresses(
         elem_props = element_map[elem_id]
         A = elem_props["A"]
         Iz = elem_props["Iz"]
-        c = np.sqrt(Iz / A)
+
+        # Compute extreme fiber distance c
+        # If depth is provided, c = depth / 2 (rectangular/strong-axis convention)
+        # Otherwise use sqrt(Iz/A) for backward compatibility with existing models
+        depth = elem_props.get("depth")
+        if depth is not None:
+            c = depth / 2.0
+        else:
+            c = np.sqrt(Iz / A)
 
         forces = forces_map.get(elem_id, np.zeros(6))
         N_i, V_i, M_i = forces[0], forces[1], forces[2]
