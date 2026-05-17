@@ -169,9 +169,9 @@ def test_maxima_v1():
 
     maxima = compute_maxima(end_forces, diagrams, stresses, d_full, nodes)
 
-    # Max deflection at tip (node 1)
-    assert maxima['deflection']['node_id'] == 1
-    assert np.isclose(maxima['deflection']['value'], 55.922330097087375, atol=0.01)
+    # Max transverse deflection at tip (node 1): |v| = P*L^3/(3EI) = 55.9223...
+    assert maxima['transverse_deflection']['node_id'] == 1
+    assert np.isclose(maxima['transverse_deflection']['value'], 55.922330097087375, atol=0.01)
 
     # Max moment at fixed end (i-end, x=0): M = P*L = 1000*120 = 120000
     assert maxima['moment']['element_id'] == 0
@@ -180,8 +180,11 @@ def test_maxima_v1():
     # Max shear is constant = 1000
     assert np.isclose(maxima['shear']['value'], 1000.0, atol=1e-6)
 
-    # No axial load
-    assert maxima['axial']['value'] == 0.0
+    # No axial displacement
+    assert maxima['axial_displacement']['value'] == 0.0
+
+    # No axial force
+    assert maxima['axial_force']['value'] == 0.0
 
     # Max stress at i-end (max moment there for bending)
     assert maxima['stress']['element_id'] == 0
@@ -291,8 +294,8 @@ def test_maxima_v2():
 
     maxima = compute_maxima(end_forces, diagrams, stresses, d_full, nodes)
 
-    # Max deflection at tip (node 1)
-    assert maxima['deflection']['node_id'] == 1
+    # Max transverse deflection at tip (node 1)
+    assert maxima['transverse_deflection']['node_id'] == 1
 
     # Max moment at i-end (x=0): M = wL^2/2 = 10*120^2/2 = 72000
     # For a cantilever with UDL, max moment is at the fixed end (station 0).
