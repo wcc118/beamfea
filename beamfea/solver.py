@@ -14,8 +14,13 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
 
-from beamfea.assembly import apply_boundary_conditions, assemble_global_stiffness
-from beamfea.assembly import assemble_nodal_loads
+from beamfea.assembly import (
+    _dof_type_to_index,
+    apply_boundary_conditions,
+    assemble_global_stiffness,
+    assemble_nodal_loads,
+    node_gdof,
+)
 
 
 
@@ -100,14 +105,7 @@ def solve_linear_static(
             node_id = bc["node_id"]
             dof_type = bc["dof"]
             value = bc["value"]
-            if dof_type == "u":
-                gdof = 3 * node_id
-            elif dof_type == "v":
-                gdof = 3 * node_id + 1
-            elif dof_type == "rz":
-                gdof = 3 * node_id + 2
-            else:
-                raise ValueError(f"Unknown dof type: {dof_type}")
+            gdof = node_gdof(node_id, _dof_type_to_index(dof_type))
             d_full[gdof] = value
         return d_full, K_FF, free_dofs
 
@@ -127,14 +125,7 @@ def solve_linear_static(
         dof_type = bc["dof"]
         value = bc["value"]
 
-        if dof_type == "u":
-            gdof = 3 * node_id
-        elif dof_type == "v":
-            gdof = 3 * node_id + 1
-        elif dof_type == "rz":
-            gdof = 3 * node_id + 2
-        else:
-            raise ValueError(f"Unknown dof type: {dof_type}")
+        gdof = node_gdof(node_id, _dof_type_to_index(dof_type))
 
         d_full[gdof] = value
 
@@ -178,14 +169,7 @@ def compute_reactions(
         node_id = bc["node_id"]
         dof_type = bc["dof"]
 
-        if dof_type == "u":
-            gdof = 3 * node_id
-        elif dof_type == "v":
-            gdof = 3 * node_id + 1
-        elif dof_type == "rz":
-            gdof = 3 * node_id + 2
-        else:
-            raise ValueError(f"Unknown dof type: {dof_type}")
+        gdof = node_gdof(node_id, _dof_type_to_index(dof_type))
 
         constrained.add(gdof)
 
