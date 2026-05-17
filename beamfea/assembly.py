@@ -26,6 +26,50 @@ from beamfea.element import (
 from beamfea.loads import fixed_end_forces_local
 
 
+def node_gdof(node_id: int, local_dof: int) -> int:
+    """Compute global DOF index for a single node DOF.
+
+    DOF ordering per node: [u, v, θz] = [0, 1, 2]
+    Global DOF: gdof = 3·node_id + local_dof
+
+    Args:
+        node_id: Node index (zero-based)
+        local_dof: Local DOF index (0=u, 1=v, 2=rz)
+
+    Returns:
+        Global DOF index
+    """
+    return 3 * node_id + local_dof
+
+
+def node_dof_names() -> list[str]:
+    """Return DOF name mapping for a single node.
+
+    Returns:
+        List of DOF names ["u", "v", "rz"] corresponding to local indices 0, 1, 2
+    """
+    return ["u", "v", "rz"]
+
+
+def _dof_type_to_index(dof_type: str) -> int:
+    """Convert a DOF type string to its local index.
+
+    Args:
+        dof_type: One of "u", "v", "rz"
+
+    Returns:
+        Local DOF index (0, 1, or 2)
+
+    Raises:
+        ValueError: If dof_type is not recognized
+    """
+    names = node_dof_names()
+    try:
+        return names.index(dof_type)
+    except ValueError:
+        raise ValueError(f"Unknown dof type: {dof_type}")
+
+
 def _transform_local_to_global(K_local: np.ndarray, theta: float) -> np.ndarray:
     """Transform a (possibly condensed) local stiffness to global coords.
 
@@ -60,8 +104,8 @@ def global_dof_indices(node_i: int, node_j: int) -> list[int]:
     Returns:
         List of 6 global DOF indices [u_i, v_i, θz_i, u_j, v_j, θz_j]
     """
-    return [3 * node_i, 3 * node_i + 1, 3 * node_i + 2,
-            3 * node_j, 3 * node_j + 1, 3 * node_j + 2]
+    return [node_gdof(node_i, k) for k in range(3)] + \
+           [node_gdof(node_j, k) for k in range(3)]
 
 
 def assemble_global_stiffness(
@@ -176,9 +220,9 @@ def assemble_nodal_loads(
     # Add nodal loads
     for load in nodal_loads:
         node_id = load["node_id"]
-        gdof_u = 3 * node_id
-        gdof_v = 3 * node_id + 1
-        gdof_rz = 3 * node_id + 2
+        gdof_u = node_gdof(node_id, 0)
+        gdof_v = node_gdof(node_id, 1)
+        gdof_rz = node_gdof(node_id, 2)
 
         F[gdof_u] += load.get("Fx", 0.0)
         F[gdof_v] += load.get("Fy", 0.0)
@@ -228,10 +272,10 @@ def assemble_nodal_loads(
             f_global = T @ f_fixed_local
 
             # Apply to global DOFs
-            gdof_i = 3 * node_i
-            gdof_j = 3 * node_j
             for i in range(6):
-                k = gdof_i + i if i < 3 else gdof_j + (i - 3)
+                target_node = node_i if i < 3 else node_j
+                local_idx = i if i < 3 else i - 3
+                k = node_gdof(target_node, local_idx)
                 F[k] += f_global[i]
 
     return F
@@ -277,14 +321,7 @@ def apply_boundary_conditions(
         dof_type = bc["dof"]
         value = bc["value"]
 
-        if dof_type == "u":
-            gdof = 3 * node_id
-        elif dof_type == "v":
-            gdof = 3 * node_id + 1
-        elif dof_type == "rz":
-            gdof = 3 * node_id + 2
-        else:
-            raise ValueError(f"Unknown dof type: {dof_type}")
+        gdof = node_gdof(node_id, _dof_type_to_index(dof_type))
 
         constrained.add(gdof)
         bc_values[gdof] = value
