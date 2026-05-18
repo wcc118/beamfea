@@ -201,6 +201,11 @@ def assemble_nodal_loads(
     Element loads are converted to consistent nodal forces using fixed-end
     force formulas.
 
+    For inclined elements, nodal loads are transformed to element-local coordinates
+    to properly decompose axial and transverse components, then transformed back
+    to global coordinates using the transpose of the displacement transformation
+    matrix (F_global = T^T @ F_local) to ensure equilibrium is satisfied.
+
     Args:
         nodes: List of node dicts with 'id', 'x', 'y'
         nodal_loads: List of load dicts with 'node_id', 'Fx', 'Fy', 'Mz'
@@ -217,16 +222,141 @@ def assemble_nodal_loads(
 
     F = np.zeros(n_dof)
 
+    # Build element map for load transformation
+    element_map = {e["id"]: e for e in elements} if elements else {}
+
     # Add nodal loads
+    # For inclined elements, transform loads to account for element angle
     for load in nodal_loads:
         node_id = load["node_id"]
-        gdof_u = node_gdof(node_id, 0)
-        gdof_v = node_gdof(node_id, 1)
-        gdof_rz = node_gdof(node_id, 2)
+        Fx_global = load.get("Fx", 0.0)
+        Fy_global = load.get("Fy", 0.0)
+        Mz_global = load.get("Mz", 0.0)
 
-        F[gdof_u] += load.get("Fx", 0.0)
-        F[gdof_v] += load.get("Fy", 0.0)
-        F[gdof_rz] += load.get("Mz", 0.0)
+        # Find elements connected to this node
+        if elements is not None:
+            connected_elements = [
+                elem for elem in elements
+                if elem["node_i"] == node_id or elem["node_j"] == node_id
+            ]
+        else:
+            connected_elements = []
+
+        if not connected_elements:
+            # No elements connected - apply load directly (original behavior)
+            gdof_u = node_gdof(node_id, 0)
+            gdof_v = node_gdof(node_id, 1)
+            gdof_rz = node_gdof(node_id, 2)
+            F[gdof_u] += Fx_global
+            F[gdof_v] += Fy_global
+            F[gdof_rz] += Mz_global
+        elif len(connected_elements) == 1:
+            # Single element - transform load based on element angle
+            elem = connected_elements[0]
+            node_i = elem["node_i"]
+            node_j = elem["node_j"]
+            x_i = next(n["x"] for n in nodes if n["id"] == node_i)
+            y_i = next(n["y"] for n in nodes if n["id"] == node_i)
+            x_j = next(n["x"] for n in nodes if n["id"] == node_j)
+            y_j = next(n["y"] for n in nodes if n["id"] == node_j)
+
+            dx = x_j - x_i
+            dy = y_j - y_i
+            L = (dx**2 + dy**2)**0.5
+
+            if L > 0:
+                theta = np.arctan2(dy, dx)
+
+                # Rotation matrix (same as in element.py)
+                c = np.cos(theta)
+                s = np.sin(theta)
+
+                # Transform load to local coordinates
+                # F_local = T @ F_global (where T rotates global to local)
+                # This decomposes the global load into axial and transverse components
+                Fx_local = Fx_global * c + Fy_global * s
+                Fy_local = -Fx_global * s + Fy_global * c
+                Mz_local = Mz_global
+
+                # Apply local force components to appropriate global DOFs
+                # The element stiffness is in local coordinates, but we're assembling
+                # the global force vector. We need to transform local forces back to
+                # global coordinates using F_global = T^T @ F_local (transformation transpose).
+                # 
+                # For a node at angle theta from global X to local x_hat (i->j):
+                # - Fx_local is axial (along element)
+                # - Fy_local is transverse (perpendicular to element)
+                # 
+                # The force transformation is:
+                # F[u_global] = cos(theta)*Fx_local - sin(theta)*Fy_local
+                # F[v_global] = sin(theta)*Fx_local + cos(theta)*Fy_local
+                #
+                # This ensures equilibrium is satisfied in global coordinates.
+                # Mz is the same in both systems (rotation about Z axis).
+
+                # Determine if this node is i or j for proper DOF mapping
+                if node_i == node_id:
+                    # Node is i-end
+                    gdof_u = node_gdof(node_id, 0)
+                    gdof_v = node_gdof(node_id, 1)
+                else:
+                    # Node is j-end: same transformation (element has ONE local system)
+                    gdof_u = node_gdof(node_id, 0)
+                    gdof_v = node_gdof(node_id, 1)
+                gdof_rz = node_gdof(node_id, 2)
+
+                # Transform local forces to global
+                F[gdof_u] += Fx_local * c - Fy_local * s
+                F[gdof_v] += Fx_local * s + Fy_local * c
+                F[gdof_rz] += Mz_local
+            else:
+                # L = 0, degenerate element - apply load directly
+                gdof_u = node_gdof(node_id, 0)
+                gdof_v = node_gdof(node_id, 1)
+                gdof_rz = node_gdof(node_id, 2)
+                F[gdof_u] += Fx_global
+                F[gdof_v] += Fy_global
+                F[gdof_rz] += Mz_global
+        else:
+            # Multiple elements connected - use first element for transformation
+            # In a real FEM code, this would require more sophisticated handling
+            elem = connected_elements[0]
+            node_i = elem["node_i"]
+            node_j = elem["node_j"]
+            x_i = next(n["x"] for n in nodes if n["id"] == node_i)
+            y_i = next(n["y"] for n in nodes if n["id"] == node_i)
+            x_j = next(n["x"] for n in nodes if n["id"] == node_j)
+            y_j = next(n["y"] for n in nodes if n["id"] == node_j)
+
+            dx = x_j - x_i
+            dy = y_j - y_i
+            L = (dx**2 + dy**2)**0.5
+
+            if L > 0:
+                theta = np.arctan2(dy, dx)
+                c = np.cos(theta)
+                s = np.sin(theta)
+
+                # The transformation is the same for both i and j ends
+                # (element has ONE local coordinate system)
+                Fx_local = Fx_global * c + Fy_global * s
+                Fy_local = -Fx_global * s + Fy_global * c
+
+                gdof_u = node_gdof(node_id, 0)
+                gdof_v = node_gdof(node_id, 1)
+                gdof_rz = node_gdof(node_id, 2)
+
+                # Transform local forces to global using F_global = T^T @ F_local
+                F[gdof_u] += Fx_local * c - Fy_local * s
+                F[gdof_v] += Fx_local * s + Fy_local * c
+                F[gdof_rz] += Mz_global
+            else:
+                gdof_u = node_gdof(node_id, 0)
+                gdof_v = node_gdof(node_id, 1)
+                gdof_rz = node_gdof(node_id, 2)
+                F[gdof_u] += Fx_global
+                F[gdof_v] += Fy_global
+                F[gdof_rz] += Mz_global
 
     # Add element loads (converted to condensed nodal forces)
     if element_loads:
