@@ -66,7 +66,7 @@ def save_results_csv(results: dict, path: str | Path) -> None:
     # Displacements CSV
     displacements = results.get("displacements", [])
     nodes = results.get("nodes", [])
-    if displacements and nodes:
+    if len(displacements) > 0 and len(nodes) > 0:
         with open(path.with_suffix(".displacements.csv"), "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["node_id", "u", "v", "rz"])
@@ -298,7 +298,7 @@ def _load_end_forces_csv(path: Path) -> list[dict]:
             end_forces.append({
                 "element_id": int(row[0]),
                 "forces_local": [float(row[1]), float(row[2]), float(row[3]),
-                                float(row[4]), float(row[5]), float(row[6])]
+                                 float(row[4]), float(row[5]), float(row[6])]
             })
 
     return end_forces
