@@ -724,10 +724,13 @@ async function showResults(){
 
     /* Maxima */
     if(R.maxima){const m=R.maxima;let h='<table class="data-table"><tr><th>Quantity</th><th>Value</th><th>Location</th></tr>';
-    h+=`<tr><td>Deflection</td><td>${fmt(m.deflection.value)}</td><td>N${m.deflection.node_id}</td></tr>`;
+    // Backend returns transverse_deflection (not deflection), axial_force (not axial)
+    const defl=m.transverse_deflection||{value:0,node_id:0};
+    const ax=m.axial_force||{value:0,element_id:0,station:0};
+    h+=`<tr><td>Deflection</td><td>${fmt(defl.value)}</td><td>N${defl.node_id}</td></tr>`;
     h+=`<tr><td>Moment</td><td>${fmt(m.moment.value)}</td><td>E${m.moment.element_id} @${fmt(m.moment.station)} in</td></tr>`;
     h+=`<tr><td>Shear</td><td>${fmt(m.shear.value)}</td><td>E${m.shear.element_id} @${fmt(m.shear.station)} in</td></tr>`;
-    h+=`<tr><td>Axial</td><td>${fmt(m.axial.value)}</td><td>E${m.axial.element_id} @${fmt(m.axial.station)} in</td></tr>`;
+    h+=`<tr><td>Axial</td><td>${fmt(ax.value)}</td><td>E${ax.element_id} @${fmt(ax.station)} in</td></tr>`;
     h+=`<tr><td>Stress</td><td>${fmt(m.stress.value)}</td><td>E${m.stress.element_id} @${fmt(m.stress.station)} in</td></tr>`;
     h+='</table>';document.getElementById('maxima-values').innerHTML=h;}
 
