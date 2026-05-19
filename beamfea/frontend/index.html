@@ -1075,8 +1075,9 @@ function drawCanvas(){
     /* Maxima flags */
     if(showMax && showLblMaxFlags && R.maxima){
         const m=R.maxima;
+        const defl=m.transverse_deflection||{value:0,node_id:0};
         /* deflection flag at node */
-        {const nd=nodes.find(n=>n.id===m.deflection.node_id);if(nd){const p=toScreen(nd.x,nd.y);drawFlag(ctx,p.x,p.y-20,'dmax='+fmt(m.deflection.value),'#e74c3c');}}
+        {const nd=nodes.find(n=>n.id===defl.node_id);if(nd){const p=toScreen(nd.x,nd.y);drawFlag(ctx,p.x,p.y-20,'dmax='+fmt(defl.value),'#e74c3c');}}
         /* moment flag */
         {const el=elements.find(e=>e.id===m.moment.element_id);if(el){
             const ni=nodes.find(n=>n.id===el.node_i),nj=nodes.find(n=>n.id===el.node_j);if(ni&&nj){
