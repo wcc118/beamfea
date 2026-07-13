@@ -132,6 +132,30 @@
         [data-theme="dark"] #labels-dropdown { background: #1a2235; color: #cbd5e1; border: 1px solid #2a3a52; }
         [data-theme="dark"] #labels-btn { background: #1a2235; color: #cbd5e1; border-color: #2a3a52; }
         [data-theme="dark"] #labels-btn:hover { background: #243447; }
+
+        /* bc radio button container */
+        #bc-radio-container {
+            position: absolute;
+            background: rgba(255,255,255,0.95);
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 8px 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            z-index: 50;
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 140px;
+        }
+        [data-theme="dark"] #bc-radio-container {
+            background: rgba(26,34,53,0.95);
+            border-color: #2a3a52;
+            color: #cbd5e1;
+        }
+        #bc-radio-container.visible { display: flex; }
+        #bc-radio-container .radio-row { display: flex; align-items: center; gap: 6px; }
+        #bc-radio-container label { cursor: pointer; font-size: 0.85rem; user-select: none; }
+        #bc-radio-container input[type=radio] { margin: 0; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -222,6 +246,13 @@
             <div id="tab-axial" class="tab-content"><div id="axial-diagrams"></div></div>
             <div id="tab-maxima" class="tab-content"><div id="maxima-values"></div></div>
         </div>
+    </div>
+
+    <!-- BC Radio Button Container -->
+    <div id="bc-radio-container">
+        <div class="radio-row"><input type="radio" name="bc-dof" value="u" id="bc-dof-u"><label for="bc-dof-u">u (axial)</label></div>
+        <div class="radio-row"><input type="radio" name="bc-dof" value="v" id="bc-dof-v" checked><label for="bc-dof-v">v (transverse)</label></div>
+        <div class="radio-row"><input type="radio" name="bc-dof" value="rz" id="bc-dof-rz"><label for="bc-dof-rz">rz (rotation)</label></div>
     </div>
 
     <!-- BC Modal -->
@@ -398,6 +429,11 @@ function wire() {
             labelsOpen = false;
             labelsDropdown.hidden = true;
         }
+        // Also check to hide BC radio buttons when clicking elsewhere
+        const bcRadioContainer = document.getElementById('bc-radio-container');
+        if (bcRadioContainer && bcRadioContainer.classList.contains('visible') && !bcRadioContainer.contains(e.target)) {
+            bcRadioContainer.classList.remove('visible');
+        }
     });
 }
 
@@ -407,6 +443,8 @@ function wire() {
 function setMode(m) {
     mode = m; elemFirst = null;
     document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+    // Hide BC radio buttons on mode change
+    hideBcRadioButtons();
     const hints = { select:'Click a node to select. Right-drag to pan. Scroll to zoom.', 'add-node':'Click canvas (opens coord dialog)',
         'add-element':'Click first node, then second', 'add-bc':'Click a node', 'add-load':'Click a node',
         'zoom-box':'Drag a rectangle to zoom in. Scroll wheel also zooms. Right-drag to pan.' };
@@ -483,6 +521,26 @@ function onCanvasMove(e) {
 
 function onCanvasClick(e) {
     const r=$c.getBoundingClientRect(), w=toWorld(e.clientX-r.left,e.clientY-r.top);
+    
+    // Check if click is on the radio button container
+    const target = e.target;
+    const bcRadioContainer = document.getElementById('bc-radio-container');
+    if (bcRadioContainer && bcRadioContainer.classList.contains('visible') && bcRadioContainer.contains(target)) {
+        // Click is on radio buttons - handle DOF selection
+        // If clicking on a radio button or label, commit the BC with that DOF
+        if (target.tagName === 'INPUT' && target.type === 'radio') {
+            commitBcWithDof(bcRadioContainer, target.value);
+        } else if (target.tagName === 'LABEL') {
+            // Find the radio button associated with this label
+            const radioId = target.getAttribute('for');
+            const radio = document.getElementById(radioId);
+            if (radio) {
+                commitBcWithDof(bcRadioContainer, radio.value);
+            }
+        }
+        return;
+    }
+    
     if (mode==='add-node') {
         editNodeIdx=null;
         document.getElementById('node-modal-title').textContent='Add Node';
@@ -504,9 +562,9 @@ function onCanvasClick(e) {
     }
     if (mode==='add-bc') {
         const hit=nearest(w.x,w.y); if(!hit) return;
-        editBcIdx=null; document.getElementById('bc-modal-title').textContent='Add BC';
-        document.getElementById('bc-node-id').value=hit.id; document.getElementById('bc-dof').value='u'; document.getElementById('bc-value').value=0;
-        openModal('bc-modal'); return;
+        // Position container using screen coordinates (for absolute positioning)
+        showBcRadioButtons(hit, e.clientX, e.clientY);
+        return;
     }
     if (mode==='add-load') {
         const hit=nearest(w.x,w.y); if(!hit) return;
@@ -519,6 +577,60 @@ function onCanvasClick(e) {
     const hit=nearest(w.x,w.y);
     selNodeId = hit ? hit.id : null;
     refreshTree(); refreshNodeForces(); drawCanvas();
+}
+
+function showBcRadioButtons(node, screenX, screenY) {
+    const container = document.getElementById('bc-radio-container');
+    if (!container) return;
+    
+    // Clear any existing selection
+    const radios = container.querySelectorAll('input[type=radio]');
+    radios.forEach(r => r.checked = false);
+    document.getElementById('bc-dof-u').checked = false;
+    document.getElementById('bc-dof-v').checked = true;
+    document.getElementById('bc-dof-rz').checked = false;
+    
+    // Store clicked node ID
+    container.dataset.nodeId = node.id;
+    container.dataset.nodeX = node.x;
+    container.dataset.nodeY = node.y;
+    
+    // Position: offset +20px X, -30px Y from click
+    const x = screenX + 20;
+    const y = screenY - 30;
+    
+    container.style.left = x + 'px';
+    container.style.top = y + 'px';
+    container.classList.add('visible');
+}
+
+function commitBcWithDof(container, dof) {
+    if (!container) return;
+    
+    const nodeId = parseInt(container.dataset.nodeId);
+    const value = 0; // Default value for boundary condition
+    
+    const o = {node_id: nodeId, dof: dof, value: value};
+    
+    // Check if editing existing BC or adding new
+    const existingIdx = bcs.findIndex(b => b.node_id === nodeId);
+    if (existingIdx !== -1) {
+        // Editing existing BC for this node
+        bcs[existingIdx] = o;
+    } else {
+        bcs.push(o);
+    }
+    
+    editBcIdx = null;
+    hideBcRadioButtons();
+    after(mode === 'add-bc');
+}
+
+function hideBcRadioButtons() {
+    const container = document.getElementById('bc-radio-container');
+    if (container) {
+        container.classList.remove('visible');
+    }
 }
 
 /* ══════════════════════════════════════════════════════════════
