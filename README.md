@@ -40,4 +40,48 @@ Do not start stage N+1 until stage N's acceptance test passes.
 ## Port
 
 The FastAPI server runs on **1337** (not 8000 — that's reserved on the target machine).
-# beamfea
+
+## Repository
+
+- **GitHub**: https://github.com/wcc118/beamfea
+- **Remote**: git@github.com:wcc118/beamfea.git
+- **Issues**: https://github.com/wcc118/beamfea/issues
+- **PRs**: https://github.com/wcc118/beamfea/pulls
+
+## Setup
+
+1. **Clone the repository:**
+   ```bash
+   git clone git@github.com:wcc118/beamfea.git
+   cd beamfea
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   pip install -e ".[dev]"
+   ```
+
+3. **Install GitHub CLI (for agent operations):**
+   ```bash
+   gh auth login
+   ```
+
+4. **Run tests:**
+   ```bash
+   pytest
+   ```
+
+5. **Launch the server:**
+   ```bash
+   beamfea  # runs on port 1337
+   ```
+
+## Agent Workflow
+
+- **Orchestrator**: Manages GitHub backlog, assigns issues to Coder
+- **Coder**: Implements issues, opens PRs
+- **Reviewer**: Reviews PRs, approves or requests changes
+
+Issue labels:
+- `status/backlog`, `status/in-progress`, `status/review`, `status/review-passed`, `status/blocked`, `status/done`
+- `quality-of-life`, `enhancement`, `bug`, `documentation`
