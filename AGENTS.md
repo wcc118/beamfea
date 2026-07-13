@@ -2,10 +2,10 @@
 
 ## Repository
 
-- **Gitea**: `http://10.0.0.98:3000/connellwc83/beamfea`
-- **Remote**: `http://10.0.0.98:3000/connellwc83/beamfea.git`
-- **GitHub remote removed**: Do not push to or reference the old GitHub repo.
-- When initializing a fresh session, always verify the Gitea remote is set with `git remote -v`.
+- **GitHub**: `https://github.com/wcc118/beamfea`
+- **Remote**: `git@github.com:wcc118/beamfea.git`
+- **Gitea remote removed**: Repository migrated to GitHub. Use GitHub for all issues/PRs.
+- When initializing a fresh session, always verify the GitHub remote is set with `git remote -v`.
 
 ## Standing Rules — Apply To Every Task
 
