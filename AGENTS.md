@@ -4,8 +4,10 @@
 
 - **GitHub**: `https://github.com/wcc118/beamfea`
 - **Remote**: `git@github.com:wcc118/beamfea.git`
-- **Gitea remote removed**: Repository migrated to GitHub. Use GitHub for all issues/PRs.
-- When initializing a fresh session, always verify the GitHub remote is set with `git remote -v`.
+- **GitHub issues**: `https://github.com/wcc118/beamfea/issues`
+- **GitHub CLI**: Installed and authenticated (`gh auth login`)
+
+When initializing a fresh session, always verify the GitHub remote is set with `git remote -v`.
 
 ## Standing Rules — Apply To Every Task
 
@@ -100,7 +102,7 @@
 
 ## Sub-issue tracking
 
-Gitea does not have native parent-child issue metadata. Use cross-referenced comments to link related issues.
+GitHub supports native parent-child issue metadata via project boards. Use cross-referenced comments or GitHub Projects to link related issues.
 
 ### Labels
 
