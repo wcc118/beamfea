@@ -2,9 +2,9 @@
 
 Planar 2D beam-element finite element analysis. Pre-process, solve linear static, post-process deflections / reactions / shear-moment-axial diagrams / grid point force balance.
 
-**Status:** working. The data model, element stiffness and assembly, loads and boundary conditions, linear static solver, post-processing, FastAPI server and browser GUI are implemented. The suite of 84 tests passes, including closed-form validation cases V1–V9 (`tests/validation`) checked against an independent reference solver. See `foundation_spec.md` for the original plan.
+**Status:** working. The data model, element stiffness and assembly, loads and boundary conditions, linear static solver, post-processing, FastAPI server and browser GUI are implemented. The suite of 84 tests passes, including closed-form validation cases V1–V9 (`tests/validation`) with expected values in `tests/validation`. See `foundation_spec.md` for the original plan.
 
-This project was built with a coder/reviewer agent workflow (see *Agent Workflow* below). The acceptance tests came before the implementation, and existing tests may not be changed to make code pass.
+This project was built with a coder/reviewer agent workflow (see *Agent Workflow* below). Each build stage has an acceptance test (table below), and agents are instructed not to change existing tests to make code pass.
 
 ## Quick start
 
